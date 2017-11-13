@@ -449,6 +449,7 @@ sVarTable* init_block_vtable(sVarTable* lv_table);
 
 sVarTable* init_var_table();
 sVarTable* clone_var_table(sVarTable* lv_table);
+void restore_var_table(sVarTable* left, sVarTable* right);
 
 void set_max_block_var_num(sVarTable* new_table, sVarTable* lv_table);
 
