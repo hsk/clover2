@@ -3,19 +3,21 @@
 !_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
-!_TAG_PROGRAM_VERSION	5.8	//
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
 -soname	Makefile	/^	gcc -shared -Wl,-soname=libExtTest.so.1 -o libExtTest.so.1.0.0 -I src\/ -I . -fPIC ext\/hello.c$/;"	m
 ALLOC	src/macros.h	17;"	d
 ANDAND_OROR_MAX	src/jit.cpp	53;"	d	file:
 ANG	Makefile	/^	if locale -a | grep ja_JP.utf8; then export LANG="ja_JP_utf8"; export LC_ALL="ja_JP.utf8"; .\/cclover2 code\/char.cl && .\/clover2 code\/char.clo; else export LANG="C.UTF-8"; export LC_ALL="C.UTF-8"; .\/cclover2 code\/char.cl && .\/clover2 code\/char.clo; fi$/;"	m
 ARRAY_SIZE	src/debug.c	112;"	d	file:
 ARRAY_VALUE_ELEMENT_MAX	src/common.h	62;"	d
+Add	lab/nested_string/syntax.ml	/^	| Add of e * e$/;"	C	type:e
+Add	lab/regexp_literal/syntax.ml	/^	| Add of e * e$/;"	C	type:e
 BOOL	src/macros.h	5;"	d
 BREAK_NUM_MAX	src/common.h	53;"	d
 BUFFER_H	src/buffer.h	2;"	d
 BYTE_CODE_INIT_SIZE	src/code.c	3;"	d	file:
-CC	Makefile	/^CC=ccache clang$/;"	m
-CFLAGS	Makefile	/^CFLAGS=-Isrc\/ -I. -L . -I\/home\/ab25cq\/include -L\/home\/ab25cq\/lib -fPIC -rdynamic -I\/usr\/local\/include -L \/usr\/local\/lib -O3 -DENABLE_INTERPRETER -Qunused-arguments$/;"	m
+CC	Makefile	/^CC=clang$/;"	m
+CFLAGS	Makefile	/^CFLAGS=-Isrc\/ -I. -L . -fPIC -rdynamic -I\/usr\/local\/include -L \/usr\/local\/lib -I \/usr\/include\/i386-linux-gnu\/\/ -L \/usr\/lib\/i386-linux-gnu\/ -Qunused-arguments$/;"	m
 CHECKML_BEGIN	src/debug.h	11;"	d
 CHECKML_BEGIN	src/debug.h	39;"	d
 CHECKML_END	src/debug.h	12;"	d
@@ -43,11 +45,13 @@ COMMON_H	src/common.h	2;"	d
 COMMON_OBJS	Makefile	/^COMMON_OBJS=src\/buffer.o src\/debug.o src\/xfunc.o src\/klass.o src\/constant.o src\/code.o src\/alignment.o src\/utf.o$/;"	m
 COMPILER_OBJS	Makefile	/^COMPILER_OBJS=src\/parser.o src\/node_type.o src\/node.o src\/cast.o src\/vtable.o src\/script_ctime.o src\/node_block.o src\/node_block_type.o src\/class_compiler.o src\/klass_compile_time.o src\/method_compiler.o src\/module.o$/;"	m
 CONS_str	src/common.h	126;"	d
-CXX	Makefile	/^CXX=ccache clang++$/;"	m
+CXX	Makefile	/^CXX=clang++$/;"	m
 CXXFLAGS	Makefile	/^CXXFLAGS=`llvm-config --cxxflags --ldflags --system-libs --libs all` -lffi -O3 -I . $/;"	m
 Clover_load	src/class_clover.c	/^BOOL Clover_load(CLVALUE** stack_ptr, CLVALUE* lvar, sVMInfo* info)$/;"	f
 DEBUG_H	src/debug.h	2;"	d
 DUMMY_ARRAY_SIZE	src/common.h	1800;"	d
+Div	lab/regexp_literal/syntax.ml	/^	| Div of e * e$/;"	C	type:e
+DivAssign	lab/regexp_literal/syntax.ml	/^	| DivAssign of e * e$/;"	C	type:e
 ELIF_NUM_MAX	src/common.h	52;"	d
 EXCEPTION_MESSAGE_MAX	src/common.h	205;"	d
 ExtTest_hello	ext/hello.c	/^BOOL ExtTest_hello(CLVALUE** stack_ptr, CLVALUE* lvar, sVMInfo* info)$/;"	f
@@ -64,7 +68,9 @@ HAVE_ICONV_H	config.h	5;"	d
 HAVE_MATH_H	config.h	2;"	d
 HAVE_PCRE_H	config.h	6;"	d
 INSTALL	Makefile	/^INSTALL=\/usr\/bin\/install -c$/;"	m
-INTERPRETER	Makefile	/^INTERPRETER=iclover2$/;"	m
+INTERPRETER	Makefile	/^INTERPRETER=$/;"	m
+Int	lab/nested_string/syntax.ml	/^	| Int of int$/;"	C	type:e
+Int	lab/regexp_literal/syntax.ml	/^	| Int of int$/;"	C	type:e
 JIT	Makefile	/^JIT=0$/;"	m
 JIT_OBJS	Makefile	/^JIT_OBJS=$/;"	m
 JIT_RUNTIME_OBJS	Makefile	/^JIT_RUNTIME_OBJS=$/;"	m
@@ -104,6 +110,11 @@ MREALLOC	src/debug.h	22;"	d
 MREALLOC	src/debug.h	45;"	d
 MSTRDUP	src/debug.h	21;"	d
 MSTRDUP	src/debug.h	44;"	d
+Main	lab/nested_string/main.ml	1;"	M
+Main	lab/parser/main.ml	1;"	M
+Main	lab/regexp_literal/main.ml	1;"	M
+Mul	lab/nested_string/syntax.ml	/^	| Mul of e * e$/;"	C	type:e
+Mul	lab/regexp_literal/syntax.ml	/^	| Mul of e * e$/;"	C	type:e
 NAME_SIZE	src/debug.c	97;"	d	file:
 NATIVE_METHOD_HASH_SIZE	src/native_method.c	3;"	d	file:
 NODE_TYPE_PAGE_SIZE	src/node_block_type.c	8;"	d	file:
@@ -853,8 +864,12 @@ PARSE_PHASE_CALCULATE_SUPER_CLASSES	src/common.h	1705;"	d
 PARSE_PHASE_COMPILE_PARAM_INITIALIZER	src/common.h	1708;"	d
 PARSE_PHASE_DO_COMPILE_CODE	src/common.h	1709;"	d
 PARSE_PHASE_MAX	src/common.h	1710;"	d
+Reg	lab/regexp_literal/syntax.ml	/^	| Reg of string$/;"	C	type:e
 STRING_EXPRESSION_MAX	src/common.h	71;"	d
 Self_convertion_of_method_name_and_params	src/vm.c	/^void Self_convertion_of_method_name_and_params(char* method_name_and_params, char* method_name_and_params2, char* class_name)$/;"	f
+Str	lab/nested_string/syntax.ml	/^	| Str of string$/;"	C	type:e
+Syntax	lab/nested_string/syntax.ml	1;"	M
+Syntax	lab/regexp_literal/syntax.ml	1;"	M
 System_WCOREDUMP	src/class_system.c	/^BOOL System_WCOREDUMP(CLVALUE** stack_ptr, CLVALUE* lvar, sVMInfo* info)$/;"	f
 System_WEXITSTATUS	src/class_system.c	/^BOOL System_WEXITSTATUS(CLVALUE** stack_ptr, CLVALUE* lvar, sVMInfo* info)$/;"	f
 System_WIFCONTINUED	src/class_system.c	/^BOOL System_WIFCONTINUED(CLVALUE** stack_ptr, CLVALUE* lvar, sVMInfo* info)$/;"	f
@@ -1293,6 +1308,8 @@ delete_comment	src/script_ctime.c	/^BOOL delete_comment(sBuf* source, sBuf* sour
 determine_method_generics_types	src/klass_compile_time.c	/^BOOL determine_method_generics_types(sNodeType* left_param, sNodeType* right_param, sNodeType* method_generics_types)$/;"	f
 display_candidates	src/interpreter.c	/^void display_candidates(char** candidates)$/;"	f
 docdir	Makefile	/^docdir=${datarootdir}\/doc$/;"	m
+e	lab/nested_string/syntax.ml	/^type e =$/;"	t
+e	lab/regexp_literal/syntax.ml	/^type e =$/;"	t
 eLVALUEKind	src/jit_common.hpp	/^enum eLVALUEKind { kLVKindNone, kLVKindInt1, kLVKindInt8, kLVKindUInt8, kLVKindInt16, kLVKindUInt16, kLVKindInt32, kLVKindUInt32, kLVKindInt64, kLVKindUInt64, kLVKindMemory, kLVKindAddress, kLVKindConstantInt1, kLVKindConstantInt8, kLVKindConstantUInt8, kLVKindConstantInt16, kLVKindConstantUInt16, kLVKindConstantInt32, kLVKindConstantUInt32, kLVKindConstantInt64, kLVKindConstantUInt64, kLVKindConstantFloat, kLVKindConstantDouble, kLVKindFloat, kLVKindDouble, kLVKindPointer8, kLVKindPointer32, kLVKindPointer64, kLVKindPointerDouble, kLVKindObject };$/;"	g
 eNodeType	src/common.h	/^enum eNodeType { kNodeTypeOperand, kNodeTypeByteValue, kNodeTypeUByteValue, kNodeTypeShortValue, kNodeTypeUShortValue, kNodeTypeIntValue, kNodeTypeUIntValue, kNodeTypeLongValue, kNodeTypeULongValue, kNodeTypeAssignVariable, kNodeTypeLoadVariable, kNodeTypeIf, kNodeTypeWhile, kNodeTypeBreak, kNodeTypeTrue, kNodeTypeFalse, kNodeTypeNull, kNodeTypeFor, kNodeTypeClassMethodCall, kNodeTypeMethodCall, kNodeTypeReturn, kNodeTypeNewOperator, kNodeTypeLoadField, kNodeTypeStoreField , kNodeTypeLoadClassField, kNodeTypeStoreClassField, kNodeTypeLoadValueFromPointer, kNodeTypeStoreValueToPointer, kNodeTypeIncrementOperand, kNodeTypeDecrementOperand, kNodeTypeIncrementWithValueOperand, kNodeTypeDecrementWithValueOperand, kNodeTypeMonadicIncrementOperand, kNodeTypeMonadicDecrementOperand, kNodeTypeLoadArrayElement, kNodeTypeStoreArrayElement, kNodeTypeChar, kNodeTypeString, kNodeTypeBuffer, kNodeTypeThrow, kNodeTypeTry, kNodeTypeBlockObject, kNodeTypeFunction, kNodeTypeBlockCall, kNodeTypeConditional, kNodeTypeNormalBlock, kNodeTypeArrayValue, kNodeTypeAndAnd, kNodeTypeOrOr, kNodeTypeHashValue, kNodeTypeRegex, kNodeTypeListValue, kNodeTypeSortableListValue, kNodeTypeEqualableListValue, kNodeTypeTupleValue, kNodeTypeCArrayValue, kNodeTypeEqualableCArrayValue, kNodeTypeSortableCArrayValue, kNodeTypeImplements, kNodeTypeGetAddress, kNodeTypeInheritCall, kNodeTypeFloatValue, kNodeTypeDoubleValue, kNodeTypePath };$/;"	g
 eOperand	src/common.h	/^enum eOperand { kOpAdd, kOpSub , kOpComplement, kOpLogicalDenial, kOpMult, kOpDiv, kOpMod, kOpLeftShift, kOpRightShift, kOpComparisonEqual, kOpComparisonNotEqual,kOpComparisonGreaterEqual, kOpComparisonLesserEqual, kOpComparisonGreater, kOpComparisonLesser, kOpAnd, kOpXor, kOpOr };$/;"	g
@@ -2028,6 +2045,9 @@ parse_phase	src/common.h	/^    int parse_phase;$/;"	m	struct:sParserInfoStruct
 parse_simple_lambda_params	src/parser.c	/^static BOOL parse_simple_lambda_params(unsigned int* node, sParserInfo* info, BOOL lambda)$/;"	f	file:
 parse_sortable_carray_value	src/parser.c	/^static BOOL parse_sortable_carray_value(unsigned int* node, sParserInfo* info) $/;"	f	file:
 parse_sortable_list_value	src/parser.c	/^static BOOL parse_sortable_list_value(unsigned int* node, sParserInfo* info) $/;"	f	file:
+parse_string	lab/nested_string/main.ml	/^let parse_string s =$/;"	v
+parse_string	lab/parser/main.ml	/^let parse_string s =$/;"	v
+parse_string	lab/regexp_literal/main.ml	/^let parse_string s =$/;"	v
 parse_string_expression	src/parser.c	/^static BOOL parse_string_expression(unsigned int* string_expressions, int* string_expression_offsets, int* num_string_expression, sBuf* value, sParserInfo* info)$/;"	f	file:
 parse_throws	src/class_compiler.c	/^static BOOL parse_throws(sParserInfo* info, sCompileInfo* cinfo, BOOL* throw_existance)$/;"	f	file:
 parse_tuple_value	src/parser.c	/^static BOOL parse_tuple_value(unsigned int* node, sParserInfo* info) $/;"	f	file:
@@ -2042,7 +2062,7 @@ parser_param_to_cl_param	src/klass_compile_time.c	/^static void parser_param_to_
 pinfo	src/common.h	/^    sParserInfo* pinfo;$/;"	m	struct:sCompileInfoStruct
 pop_global_stack	src/stack.c	/^CLVALUE pop_global_stack()$/;"	f
 postposition_operator	src/parser.c	/^static BOOL postposition_operator(unsigned int* node, sParserInfo* info, int* num_method_chains, unsigned int max_method_chains_node[METHOD_CHAIN_MAX])$/;"	f	file:
-prefix	Makefile	/^prefix=\/home\/ab25cq$/;"	m
+prefix	Makefile	/^prefix=\/usr\/local$/;"	m
 print_node_type	src/node_type.c	/^void print_node_type(sNodeType* node_type)$/;"	f
 prototypes	configure	/^   function prototypes and stuff, but not '\\xHH' hex character constants.$/;"	f
 push_jit_object	src/jit_runtime.cpp	/^void push_jit_object(CLObject obj)$/;"	f
@@ -2346,6 +2366,8 @@ set_method_index_to_class	src/klass_compile_time.c	/^void set_method_index_to_cl
 set_signal	src/main.c	/^static void set_signal()$/;"	f	file:
 set_signal_for_interpreter	src/interpreter.c	/^static void set_signal_for_interpreter() $/;"	f	file:
 sharedstatedir	Makefile	/^sharedstatedir=${prefix}\/com$/;"	m
+show	lab/nested_string/syntax.ml	/^let rec show = function$/;"	v
+show	lab/regexp_literal/syntax.ml	/^let rec show = function$/;"	v
 show_double	src/jit_debug_runtime.cpp	/^void show_double(double number)$/;"	f
 show_exception_message	src/exception.c	/^void show_exception_message(char* message)$/;"	f
 show_float	src/jit_debug_runtime.cpp	/^void show_float(float number)$/;"	f
@@ -2405,6 +2427,23 @@ substitution_posibility_for_node_block_type	src/node_block_type.c	/^BOOL substit
 substitution_posibility_with_class_name	src/node_type.c	/^BOOL substitution_posibility_with_class_name(sNodeType* left, char* right_class_name)$/;"	f
 sysconfdir	Makefile	/^sysconfdir=${prefix}\/etc\/clover2$/;"	m
 t_malloc_entry	src/debug.c	/^typedef struct _t_malloc_entry t_malloc_entry;$/;"	t	typeref:struct:_t_malloc_entry	file:
+test_add	lab/parser/main.ml	/^let test_add () =$/;"	v
+test_bstring_literal	lab/parser/main.ml	/^let test_bstring_literal() =$/;"	v
+test_charactor_literal	lab/parser/main.ml	/^let test_charactor_literal() =$/;"	v
+test_collection	lab/parser/main.ml	/^let test_collection() =$/;"	v
+test_comparison	lab/parser/main.ml	/^let test_comparison () =$/;"	v
+test_conditional	lab/parser/main.ml	/^let test_conditional() =$/;"	v
+test_control	lab/parser/main.ml	/^let test_control() =$/;"	v
+test_eq	lab/parser/main.ml	/^let test_eq () =$/;"	v
+test_implements	lab/parser/main.ml	/^let test_implements () =$/;"	v
+test_literal	lab/parser/main.ml	/^let test_literal () =$/;"	v
+test_lor	lab/parser/main.ml	/^let test_lor () =$/;"	v
+test_mul	lab/parser/main.ml	/^let test_mul () =$/;"	v
+test_or	lab/parser/main.ml	/^let test_or () =$/;"	v
+test_pstring_literal	lab/parser/main.ml	/^let test_pstring_literal() =$/;"	v
+test_regexp_literal	lab/parser/main.ml	/^	let test_regexp_literal() =$/;"	v
+test_shift	lab/parser/main.ml	/^let test_shift () =$/;"	v
+test_string_literal	lab/parser/main.ml	/^let test_string_literal() =$/;"	v
 this_module_is_modified	src/module.c	/^void this_module_is_modified(sCLModule* self)$/;"	f
 throw_expression	src/parser.c	/^static BOOL throw_expression(unsigned int* node, sParserInfo* info)$/;"	f	file:
 trunc_value	src/jit_sub.cpp	/^LVALUE trunc_value(LVALUE* llvm_value, int size)$/;"	f

@@ -2,6 +2,49 @@ let parse_string s =
 	Lexer.reset();
 	(Parser.expression Lexer.token (Lexing.from_string s))
 
+let test_collection() =
+	assert(parse_string "list{}" = 1);
+	assert(parse_string "equalable_list{}" = 1);
+	assert(parse_string "elist{}" = 1);
+	assert(parse_string "array{}" = 1);
+	assert(parse_string "equalable_array{}" = 1);
+	assert(parse_string "earray{}" = 1);
+	assert(parse_string "tuple{}" = 1);
+	assert(parse_string "[]" = 1);
+
+	assert(parse_string "list{1}" = 1);
+	assert(parse_string "equalable_list{1}" = 1);
+	assert(parse_string "elist{1}" = 1);
+	assert(parse_string "array{1}" = 1);
+	assert(parse_string "equalable_array{1}" = 1);
+	assert(parse_string "earray{1}" = 1);
+	assert(parse_string "tuple{1}" = 1);
+	assert(parse_string "[1]" = 1);
+
+	assert(parse_string "list{1,1+2}" = 1);
+	assert(parse_string "equalable_list{1,1+2}" = 1);
+	assert(parse_string "elist{1,1+2}" = 1);
+	assert(parse_string "array{1,1+2}" = 1);
+	assert(parse_string "equalable_array{1,1+2}" = 1);
+	assert(parse_string "earray{1,1+2}" = 1);
+	assert(parse_string "tuple{1,1+2}" = 1);
+	assert(parse_string "[1,1+2]" = 1);
+
+	assert(parse_string "list{1,1+2,3}" = 1);
+	assert(parse_string "equalable_list{1,1+2,3}" = 1);
+	assert(parse_string "elist{1,1+2,3}" = 1);
+	assert(parse_string "array{1,1+2,3}" = 1);
+	assert(parse_string "equalable_array{1,1+2,3}" = 1);
+	assert(parse_string "earray{1,1+2,3}" = 1);
+	assert(parse_string "tuple{1,1+2,3}" = 1);
+	assert(parse_string "[1,1+2,3]" = 1);
+
+	assert(parse_string "hash{}" = 1);
+	assert(parse_string "hash{1:1}" = 1);
+	assert(parse_string "hash{1:1,2:1+2}" = 1);
+	assert(parse_string "hash{\"1\":1,\"2\":1+2,\"3\":3}" = 1);
+
+	()
 let test_string_literal() =
 	assert(parse_string "\"string\"" = 1);
 	(* escape sequence *)
@@ -154,7 +197,34 @@ let test_conditional() =
 	assert(parse_string "1.1f ? 1 : 1" = 1);
 	assert(parse_string "1 ? 1 : 1 ? 1 : 1" = 1);
 	()
+let test_control() =
+	assert(parse_string "{}" = 1);
+	assert(parse_string "{1}" = 1);
+	assert(parse_string "{1;2}" = 1);
+	assert(parse_string "{1;2;}" = 1);
+	assert(parse_string "if(1){}" = 1);
+	assert(parse_string "if(1){}else{}" = 1);
+	assert(parse_string "if(1){}elif(1){}" = 1);
+	assert(parse_string "if(1){}elif(1){}else{}" = 1);
+	assert(parse_string "if(1){}elif(1){}elif(1){}else{}" = 1);
+	assert(parse_string "while(1){break}" = 1);
+	assert(parse_string "for(1;1;1){return}" = 1);
+	assert(parse_string "for(1;1;1){return return 1}" = 1);
+	assert(parse_string "throw 1" = 1);
+	assert(parse_string "try { throw 1} catch (a:int) { 1 } " = 1);
+	(*assert(parse_string "try { throw 1} catch (a:int) { 1 } catch (a:obj) { 1 } " = 1);*)
+	assert(parse_string "lambda () {}" = 1);
+	assert(parse_string "closure () {}" = 1);
+	assert(parse_string "lambda ():int {}" = 1);
+	assert(parse_string "closure ():int {}" = 1);
+	assert(parse_string "lambda (a:int,b:int):int {}" = 1);
+	assert(parse_string "closure (a:int,b:int):int {}" = 1);
+	assert(parse_string "def a(a:int,b:int):int {}" = 1);
+	assert(parse_string "inherit ()" = 1);
+	assert(parse_string "inherit (1 @a,2@b)" = 1);
+	()
 let _ =
+	test_collection();
 	test_literal();
 	(*test_implements();*)
 	test_mul();
@@ -165,4 +235,5 @@ let _ =
 	test_or();
 	test_lor();
 	test_conditional();
+	test_control();
 	Printf.printf "ok\n"

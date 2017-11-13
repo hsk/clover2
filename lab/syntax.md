@@ -58,7 +58,7 @@ control_expression::= normal_block | if_expression
                     | throw_expression | try_expression
                     | return_expression | new_expression
                     | "closure" block_object | "lambda" block_object | function
-                    | iniherit
+                    | inherit
 
 normal_block      ::= block
 if_expression     ::= "if" "(" expression ")" block
@@ -72,7 +72,7 @@ return_expression ::= "return" expression?
 new_expression    ::= "new" type_for_new method_params
 block_object      ::= "(" param_list ")" (':' type)? block 
 function          ::= "def" word "(" param_list ")" (':' type)? block
-iniherit          ::= "inherit" method_params
+inherit           ::= "inherit" method_params
 
 param             ::= word ":" type
 param_list        ::= (param ("," param)*)?
@@ -101,7 +101,7 @@ command_method_params
 
 expression_node   ::= collection_expression | assign_expression | method_expression
                     | literal | slash_word | '(' expression ')' | '&' expression
-
+                    | control_expression
 postposition_operator
                   ::= '..' word (method_params|(assign_operator|'==') expression)?
                     | '[' expression "]" ((assign_operator|'==') expression)?

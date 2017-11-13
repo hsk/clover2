@@ -17,8 +17,13 @@ let div_mode = ref false
 %token <int> INTEGER
 %token <float> FLOAT
 %token <bool> BOOLEAN
+%token <string> ANNOTATION
 %token NULL
 %token <string> WORD
+%token <string> SLASH_WORD
+%token LIST ELIST SLIST ARRAY EARRAY SARRAY HASH TUPLE
+%token LBRACK RBRACK
+%token RETURN NEW BREAK FOR WHILE IF ELIF ELSE TRY CATCH THROW LAMBDA CLOSURE DEF INHERIT
 %token INC DEC TIL NOT
 %token IMPLEMENTS
 %token MUL DIV MOD
@@ -33,18 +38,28 @@ let div_mode = ref false
 %token COLON QUEST
 %token LPAREN RPAREN
 %token LBRACE RBRACE
+%token COMMA SEMI
+%token COLON_ASSIGN ASSIGN
 %token EOF
+%left INC DEC TIL ADD SUB
+%left RETURN
 %type <int> expression
 %start expression
 %%
 
 /*
 
-class_type        : word
-type              : "lambda" ('(' type_list? ')')? (':' type)? '[]'? annotation?
-                    | word ('<' type_list '>')? '[]'? annotation?
-type_list         : type (',' type)*
+class_type        : WORD
 */
+type_             : LAMBDA /* (LPAREN type_list? RPAREN)? type_option '[]'? annotation?*/ { 1 }
+type_             : LAMBDA LPAREN type_list RPAREN /*type_option '[]'? annotation?*/ { 1 }
+                  | WORD  /*('<' type_list1 '>')? '[]'? annotation? */ { 1 }
+
+type_list         : /* empty */ { 1 }
+                  | type_list1 { 1 }
+type_list1        : type_ { 1 }
+                  | type_ COMMA type_list1 { 1 }
+
 literal           : INTEGER { 1 }
                   | ADD INTEGER { 1 }
                   | SUB INTEGER { 1 }
@@ -64,70 +79,107 @@ string_literal    : STR                                { 1 }
                   | LSTR string_expression RSTR        { 1 }
 string_expression : expression ISTR string_expression  { 1 }
                   | expression                         { 1 }
-
 path_literal      : PSTR                               { 1 }
                   | PLSTR string_expression RSTR       { 1 }
-
 buffer_literal    : BSTR                               { 1 }
                   | BLSTR string_expression RSTR       { 1 }
-
+regexp_literal    : REG_STR                             { 1 }
+                  | REG_LSTR regexp_expression REG_RSTR { 1 }
 regexp_expression : expression REG_ISTR regexp_expression { 1 }
                   | expression                            { 1 }
 
-regexp_literal    : REG_STR                             { 1 }
-                  | REG_LSTR regexp_expression REG_RSTR { 1 }
-
-/*
-regexp_literal    : '/' ('\' '\' '{' | '\' string_expression | not "/")* "/"
-                      ('g'|'i'|'s'|'m'|'A'|'D'|'U'|'x')*
-
 collection_expression
-                  : list | equalable_list | sortable_list
-                    | array_value | array | equalable_array | sortable_array
-                    | hash | tuple
+                  : list_ {1}
+                  | equalable_list { 1 }
+                  | sortable_list { 1 }
+                  | array_value { 1 }
+                  | array { 1 }
+                  | equalable_array { 1 }
+                  | sortable_array { 1 }
+                  | hash { 1 }
+                  | tuple { 1 }
 
-array_value       : '[' expressions ']'
-array             : "array" '{' expressions '}'
-equalable_array   : ("equalable_array" | "earray") '{' expressions '}'
-sortable_array    : ("sortable_array" | "sarray") '{' expressions '}'
-list              : "list" '{' expressions '}'
-equalable_list    : ("equalable_list" | "elist") '{' expressions '}'
-sortable_list     : ("sortable_list" | "slist") '{' expressions '}'
-hash              : "hash" '{' (expression_pair (',' expression_pair)*)? '}'
-tuple             : "tuple" '{' expressions '}'
+array_value       : LBRACK expressions RBRACK { 1 }
+array             : ARRAY LBRACE expressions RBRACE { 1 }
+equalable_array   : EARRAY LBRACE expressions RBRACE { 1 }
+sortable_array    : SARRAY LBRACE expressions RBRACE { 1 }
+list_             : LIST LBRACE expressions RBRACE { 1 }
+equalable_list    : ELIST LBRACE expressions RBRACE { 1 }
+sortable_list     : SLIST LBRACE expressions RBRACE { 1 }
+hash              : HASH LBRACE expression_pairs RBRACE { 1 }
+tuple             : TUPLE LBRACE expressions RBRACE { 1 }
 
-expressions       : (expression (',' expression)*)?
-expression_pair   : expression ":" expression
+expressions       : /* empty */ { 1 }
+                  | expressions1 { 1 }
+expressions1      : expression { 1 }
+                  | expression COMMA expressions1 { 1 }
 
-control_expression: normal_block | if_expression
-                    | while_expression | for_expression | "break"
-                    | throw_expression | try_expression
-                    | return_expression | new_expression
-                    | "closure" block_object | "lambda" block_object | function
-                    | iniherit
+expression_pairs  : /* empty */ { 1 }
+                  | expression_pairs1 { 1 }
+expression_pairs1 : expression_pair { 1 }
+                  | expression_pair COMMA expression_pairs1 { 1 }
+expression_pair   : expression COLON expression { 1 }
 
-normal_block      : block
-if_expression     : "if" "(" expression ")" block
-                      ("elif" "(" expression ")" block)*
-                      ("else" block)?
-while_expression  : "while" "(" expression ")" block
-for_expression    : "for" "(" expression ";" expression ";" expression ")" block
-throw_expression  : "throw" expression
-try_expression    : "try" block "catch" "(" param_list ")" block
-return_expression : "return" expression?
-new_expression    : "new" type_for_new method_params
-block_object      : "(" param_list ")" (':' type)? block 
-function          : "def" word "(" param_list ")" (':' type)? block
-iniherit          : "inherit" method_params
+control_expression: normal_block { 1 }
+                  | if_expression { 1 }
+                  | while_expression { 1 }
+                  | for_expression { 1 }
+                  | BREAK { 1 }
+                  | throw_expression { 1 }
+                  | try_expression { 1 }
+                  | return_expression { 1 }
+                  | new_expression { 1 }
+                  | CLOSURE block_object { 1 }
+                  | LAMBDA block_object { 1 }
+                  | function_ { 1 }
+                  | inherit_ { 1 }
 
-param             : word ":" type
-param_list        : (param ("," param)*)?
-block             : "{" (expression ";"?)* "}"
-type_for_new      : word ('<' type_list '>')? ('[' expression "]")?
+normal_block      : block { 1 }
+if_expression     : IF LPAREN expression RPAREN block elif { 1 }
+elif              : else_block { 1 }
+                  | elif1 { 1 }
+elif1             : ELIF LPAREN expression RPAREN block else_block { 1 }
+                  | ELIF LPAREN expression RPAREN block elif1 { 1 }
+else_block        : /* empty */ { 1 }
+                  | ELSE block { 1 }
+while_expression  : WHILE LPAREN expression RPAREN block { 1 }
+for_expression    : FOR LPAREN expression SEMI expression SEMI expression RPAREN block { 1 }
+throw_expression  : THROW expression { 1 }
+try_expression    : TRY block CATCH LPAREN param_list RPAREN block { 1 }
+return_expression : RETURN expression { 1 }
+                  | RETURN { 1 }
+new_expression    : NEW type_for_new method_params { 1 }
 
-assign_expression : slash_word ':=' expression
-                    | slash_word ':' type '=' expression
-                    | slash_word '=' expression
+block_object      : LPAREN param_list RPAREN type_option block { 1 }
+type_option       : /* empty */ { 1 }
+                  | COLON type_ { 1 }
+
+function_         : DEF WORD LPAREN param_list RPAREN type_option block { 1 }
+inherit_          : INHERIT method_params { 1 }
+
+param_list        : /* empty */ { 1 }
+                  | param_list1 { 1 }
+param_list1       : param { 1 }
+                  | param COMMA param_list1 { 1 }
+param             : WORD COLON type_ { 1 }
+                  
+block             : LBRACE statement RBRACE { 1 }
+statement         : /* empty */ { 1 }
+                  | statement1 { 1 }
+statement1        : expression SEMI { 1 }
+                  | expression { 1 }
+                  | expression SEMI statement1 { 1 }
+                  | expression statement1 { 1 }
+                  
+type_for_new      : WORD /*('<' type_list '>')? ('[' expression "]")?*/ { 1 }
+                  
+slash_word        : SLASH_WORD { 1 }
+                  | WORD { 1 }
+
+assign_expression : slash_word COLON_ASSIGN expression { 1 }
+                  | slash_word COLON type_ ASSIGN expression { 1 }
+                  | slash_word ASSIGN expression { 1 }
+                  /*
                     | slash_word assign_operator expression
 assign_operator   : "+="|"-="|"*="|"/="|"%="|"<<="|">>="|"&="|"^="|"|="
 
@@ -135,17 +187,24 @@ method_expression : slash_word type '.' word method_params
                     | slash_word type '.' word (assign_operator|'==') expression
                     | slash_word method_params
                     | slash_word command_method_params
-                      ("||" word command_method_params|"&&"|";"|"\n")*
-
-method_params     : ('(' (expression ann (',' expression ann)*)? ')')?
-                      simple_lambda_params?
+                      ("||" word command_method_params|"&&"|SEMI|"\n")*
+*/
+method_params     : LPAREN expression_anns RPAREN /* simple_lambda_params? */ { 1 }
+                  | /* simple_lambda_params? */ { 1 }
+expression_anns   : /* empty */ { 1 }
+                  | expression_anns1 { 1 }
+expression_anns1  : expression ann { 1 }
+                  | expression ann COMMA expression_anns1 { 1 }
+ann               : ANNOTATION { 1 }
+/*
 simple_lambda_params
-                  : '{' ("|" param_list "|" (':' type)?)? (expression ";"?)* '}'
+                  : LBRACE ("|" param_list "|" type_option)? (expression SEMI?)* RBRACE
 command_method_params
-                  : ";" | "\n" | '${' (not '}')* '}'
+                  : SEMI | "\n" | '${' (not RBRACE)* RBRACE
                     | "$" (alpha|num|'_')* | '\' . | '"' . * '"' | "'" . * "'" *
 */
-expression_node   : /*collection_expression*/
+expression_node   : collection_expression { 1 }
+                  | control_expression { 1 }
                   /*| assign_expression */
                   /*| method_expression */
                   | literal { 1 }
@@ -200,8 +259,8 @@ expression_or     : expression_xor                        { 1 }
 expression_lor    : expression_or                         { 1 }
                   | expression_lor LAND expression_or     { 1 }
                   | expression_lor LOR expression_or      { 1 }
-expression_conditional
-                  : expression_lor                                   { 1 }
+expression_conditional:
+                  | expression_lor                                   { 1 }
                   | expression_lor QUEST expression COLON expression { 1 }
                   
 expression        : expression_conditional { 1 }

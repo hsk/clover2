@@ -16,23 +16,46 @@ let float       = ['0'-'9']+ '.' ['0'-'9']+ ['f' 'F']?
 let integer     = ['1'-'9'] ['0'-'9']* num_postfix?
 let hex_number  = "0x" ['0'-'9' 'a'-'f' 'A'-'F']+ num_postfix?
 let oct_number  = '0' ['0'-'7']* num_postfix?
-(*
-let slash_word  = ("./"|"../")? alpha (alpha|'_'|'/')*
-*)
+let slash_word  = ("./"|"../") alpha (alpha|'_'|'/')*
 let word        = alpha (alpha | '_')*
-(*
-let annotation  = '@' (alpha (alpha | num | '-' | '_' | '[' | ']')* )?
-let ann         = '@' (alpha | '_')*
-*)
+let annotation  = '@' (alpha (alpha | num | ['-' '_' '[' ']'])*)?
+
 rule token = parse
 | [' ' '\t' '\n' '\r']+ { token lexbuf }
 | float { n(FLOAT(1.0)) }
 | integer { n(INTEGER(1)) }
 | hex_number { n(INTEGER(1)) }
 | oct_number { n(INTEGER(1)) }
+| annotation as s { n(ANNOTATION(s))}
 | "true" { n(BOOLEAN(true)) }
 | "false" { n(BOOLEAN(false)) }
 | "null" { n NULL }
+| "list" { n LIST }
+| "equalable_list" { n ELIST }
+| "elist" { n ELIST }
+| "array" { n ARRAY }
+| "equalable_array" { n EARRAY }
+| "earray" { n EARRAY }
+| "hash" { n HASH }
+| "tuple" { n TUPLE }
+| "if" { n IF }
+| "elif" { n ELIF }
+| "else" { n ELSE }
+| "break" { r BREAK }
+| "while" { n WHILE }
+| "for" { n FOR }
+| "return" { r RETURN }
+| "new" { r NEW }
+| "throw" { r THROW }
+| "try" { n TRY }
+| "catch" { n CATCH }
+| "closure" { n CLOSURE }
+| "lambda" { n LAMBDA }
+| "def" { n DEF }
+| "inherit" { n INHERIT }
+| "[" { r LBRACK }
+| "]" { n RBRACK }
+| ";" { r SEMI }
 | "++" { r INC }
 | "--" { r DEC }
 | '~' { r TIL }
@@ -57,6 +80,7 @@ rule token = parse
 | "||" { r LOR }
 | '?' { r QUEST }
 | ':' { r COLON }
+| ',' { r COMMA }
 | eof { EOF }
 | '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' { n(STR s) }
 | '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" { braces := BStr :: !braces; r(LSTR s) }
@@ -75,6 +99,7 @@ rule token = parse
         | BReg::xs -> braces := xs; regexp_str lexbuf
         | BNone::xs -> braces := xs; n RBRACE
         | [] -> failwith "paren nest error" }
+| slash_word as w { n(SLASH_WORD w) }
 | word as w { n(WORD w) }
 | _ { failwith
         (Printf.sprintf "unknown token %s near characters %d-%d"
@@ -100,11 +125,15 @@ and regexp = parse
            (Lexing.lexeme_start lexbuf)
            (Lexing.lexeme_end lexbuf)) }
 and regexp_str = parse
-| (([^ '/' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BReg :: !braces; r(REG_ISTR s)}
-| (([^ '/' '\\'] | '\\' [^ '{'])* as s) '/' (['g' 'i' 's' 'm' 'A' 'D' 'U' 'x']* as o) { n(REG_RSTR(s,o)) }
+| (([^ '/' '\\'] | "\\\\{" | '\\' [^ '{'])* as s) "\\{" {braces := BReg :: !braces; r(REG_ISTR s)}
+| (([^ '/' '\\'] | "\\\\{" | '\\' [^ '{'])* as s) '/' (['g' 'i' 's' 'm' 'A' 'D' 'U' 'x']* as o) { n(REG_RSTR(s,o)) }
 | eof { EOF }
 | _ { failwith
         (Printf.sprintf "unknown token %s near characters %d-%d"
            (Lexing.lexeme lexbuf)
            (Lexing.lexeme_start lexbuf)
            (Lexing.lexeme_end lexbuf)) }
+
+{
+  let a () = Printf.printf "ok"
+}
