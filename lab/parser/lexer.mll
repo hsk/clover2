@@ -1,7 +1,13 @@
 {
 open Parser
-type brace = BNone | BStr
+type brace = BNone | BStr | BReg
 let braces = ref []
+let reg = ref true
+let reset () =
+  braces := [];
+  reg := true
+let r t = reg := true; t
+let n t = reg := false; t
 }
 let alpha       = ['a'-'z' 'A'-'Z']
 let num         = ['0'-'9']
@@ -20,59 +26,82 @@ let ann         = '@' (alpha | '_')*
 *)
 rule token = parse
 | [' ' '\t' '\n' '\r']+ { token lexbuf }
-| float { FLOAT(1.0) }
-| integer { INTEGER(1) }
-| hex_number { INTEGER(1) }
-| oct_number { INTEGER(1) }
-| "true" { BOOLEAN(true) }
-| "false" { BOOLEAN(false) }
-| "null" { NULL }
-| "++" { INC }
-| "--" { DEC }
-| '~' { TIL }
-| '!' { NOT }
-| "implements" { IMPLEMENTS }
-| '*' { MUL }
-| "/" { DIV }
-| '%' { MOD }
-| '+' { ADD }
-| "-" { SUB }
-| ">>" { RSH }
-| "<<" { LSH }
-| ">=" { GE }
-| "<=" { LE }
-| ">" { GT }
-| "<" { LT }
-| "==" { EQ }
-| "!=" { NE }
-| '&' { AND }
-| '^' { XOR }
-| '|' { OR }
-| "&&" { LAND }
-| "||" { LOR }
-| '?' { QUEST }
-| ':' { COLON }
+| float { n(FLOAT(1.0)) }
+| integer { n(INTEGER(1)) }
+| hex_number { n(INTEGER(1)) }
+| oct_number { n(INTEGER(1)) }
+| "true" { n(BOOLEAN(true)) }
+| "false" { n(BOOLEAN(false)) }
+| "null" { n NULL }
+| "++" { r INC }
+| "--" { r DEC }
+| '~' { r TIL }
+| '!' { r NOT }
+| "implements" { r IMPLEMENTS }
+| '*' { r MUL }
+| '%' { r MOD }
+| '+' { r ADD }
+| "-" { r SUB }
+| ">>" { r RSH }
+| "<<" { r LSH }
+| ">=" { r GE }
+| "<=" { r LE }
+| ">" { r GT }
+| "<" { r LT }
+| "==" { r EQ }
+| "!=" { r NE }
+| '&' { r AND }
+| '^' { r XOR }
+| '|' { r OR }
+| "&&" { r LAND }
+| "||" { r LOR }
+| '?' { r QUEST }
+| ':' { r COLON }
 | eof { EOF }
-| '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' {STR s}
-| '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BStr :: !braces; LSTR s}
-| "'" ('\\' _ as c) "'" { CHR c }
-| "'" ([^ '\\'] as c) "'" { CHR (String.make 1 c) }
-| '(' { LPAREN }
-| ')' { RPAREN }
-| '{' { braces := BNone::!braces; LBRACE }
+| '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' { n(STR s) }
+| '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" { braces := BStr :: !braces; r(LSTR s) }
+| ['p' 'P'] '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' { n(PSTR s) }
+| ['p' 'P'] '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BStr :: !braces; r(PLSTR s)}
+| ['b' 'B'] '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' { n(BSTR s) }
+| ['b' 'B'] '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BStr :: !braces; r(BLSTR s)}
+| '/' { if !reg then regexp lexbuf else r DIV  }
+| "'" ('\\' _ as c) "'" { n(CHR c) }
+| "'" ([^ '\\'] as c) "'" { n(CHR (String.make 1 c)) }
+| '(' { r LPAREN }
+| ')' { n RPAREN }
+| '{' { braces := BNone::!braces; r LBRACE }
 | '}' { match !braces with
         | BStr::xs -> braces := xs; str lexbuf
-        | BNone::xs -> braces := xs; RBRACE
+        | BReg::xs -> braces := xs; regexp_str lexbuf
+        | BNone::xs -> braces := xs; n RBRACE
         | [] -> failwith "paren nest error" }
-| word as w { WORD w }
+| word as w { n(WORD w) }
 | _ { failwith
         (Printf.sprintf "unknown token %s near characters %d-%d"
            (Lexing.lexeme lexbuf)
            (Lexing.lexeme_start lexbuf)
            (Lexing.lexeme_end lexbuf)) }
 and str = parse
-| (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BStr :: !braces; ISTR s}
-| (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' {RSTR s}
+| (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BStr :: !braces; n(ISTR s)}
+| (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' { n(RSTR s) }
+| eof { EOF }
+| _ { failwith
+        (Printf.sprintf "unknown token %s near characters %d-%d"
+           (Lexing.lexeme lexbuf)
+           (Lexing.lexeme_start lexbuf)
+           (Lexing.lexeme_end lexbuf)) }
+and regexp = parse
+| (([^ '/' '\\'] | '\\' [^ '{'])* as s) '/' (['g' 'i' 's' 'm' 'A' 'D' 'U' 'x']* as o) { n(REG_STR(s,o)) }
+| (([^ '/' '\\'] | '\\' [^ '{'])* as s) "\\{" { braces := BReg :: !braces; r(REG_LSTR s) }
+| eof { EOF }
+| _ { failwith
+        (Printf.sprintf "unknown token %s near characters %d-%d"
+           (Lexing.lexeme lexbuf)
+           (Lexing.lexeme_start lexbuf)
+           (Lexing.lexeme_end lexbuf)) }
+and regexp_str = parse
+| (([^ '/' '\\'] | '\\' [^ '{'])* as s) "\\{" {braces := BReg :: !braces; r(REG_ISTR s)}
+| (([^ '/' '\\'] | '\\' [^ '{'])* as s) '/' (['g' 'i' 's' 'm' 'A' 'D' 'U' 'x']* as o) { n(REG_RSTR(s,o)) }
 | eof { EOF }
 | _ { failwith
         (Printf.sprintf "unknown token %s near characters %d-%d"

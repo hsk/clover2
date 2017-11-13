@@ -1,9 +1,18 @@
 %{
+let div_mode = ref false
 %}
 %token <string> STR
 %token <string> LSTR
 %token <string> ISTR
 %token <string> RSTR
+%token <string> PSTR
+%token <string> PLSTR
+%token <string> BSTR
+%token <string> BLSTR
+%token <string*string> REG_STR
+%token <string> REG_LSTR
+%token <string> REG_ISTR
+%token <string*string> REG_RSTR
 %token <string> CHR
 %token <int> INTEGER
 %token <float> FLOAT
@@ -36,8 +45,7 @@ type              : "lambda" ('(' type_list? ')')? (':' type)? '[]'? annotation?
                     | word ('<' type_list '>')? '[]'? annotation?
 type_list         : type (',' type)*
 */
-literal           :
-                  | INTEGER { 1 }
+literal           : INTEGER { 1 }
                   | ADD INTEGER { 1 }
                   | SUB INTEGER { 1 }
                   | FLOAT { 1 }
@@ -47,9 +55,9 @@ literal           :
                   | NULL { 1 }
                   | charactor_literal { 1 }
                   | string_literal { 1 }
-                  /*
-                  | path_literal | buffer_literal | regexp_literal
-                  */
+                  | path_literal   { 1 }
+                  | buffer_literal { 1 }
+                  | regexp_literal { 1 }
 
 charactor_literal : CHR                                { 1 }
 string_literal    : STR                                { 1 }
@@ -57,9 +65,19 @@ string_literal    : STR                                { 1 }
 string_expression : expression ISTR string_expression  { 1 }
                   | expression                         { 1 }
 
+path_literal      : PSTR                               { 1 }
+                  | PLSTR string_expression RSTR       { 1 }
+
+buffer_literal    : BSTR                               { 1 }
+                  | BLSTR string_expression RSTR       { 1 }
+
+regexp_expression : expression REG_ISTR regexp_expression { 1 }
+                  | expression                            { 1 }
+
+regexp_literal    : REG_STR                             { 1 }
+                  | REG_LSTR regexp_expression REG_RSTR { 1 }
+
 /*
-path_literal      : ("P"|"p") '"' (not('"'|'\') | escape_sequence)* '"'
-buffer_literal    : ("B"|"b") '"' (not('"'|'\') | escape_sequence)* '"'
 regexp_literal    : '/' ('\' '\' '{' | '\' string_expression | not "/")* "/"
                       ('g'|'i'|'s'|'m'|'A'|'D'|'U'|'x')*
 

@@ -5,5 +5,6 @@ all:
 	ocamlc parser.ml lexer.ml main.ml -o test
 	rm -rf *.cm* parser.ml lexer.ml
 	./test
+	rm -rf test
 clean:
 	rm -rf *.cm* parser.ml lexer.ml test

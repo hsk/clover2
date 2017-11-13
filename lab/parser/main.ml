@@ -1,5 +1,5 @@
 let parse_string s =
-	Lexer.braces := [];
+	Lexer.reset();
 	(Parser.expression Lexer.token (Lexing.from_string s))
 
 let test_string_literal() =
@@ -16,6 +16,55 @@ let test_string_literal() =
 	assert(parse_string "\"ab\\{1+\"aaa\"+2}cc\"" = 1);
 	assert(parse_string "\"ab\\{1+2}cd\\{3+4}de\"" = 1);
 	()
+let test_pstring_literal() =
+	assert(parse_string "p\"string\"" = 1);
+	assert(parse_string "P\"string\"" = 1);
+	(* escape sequence *)
+	assert(parse_string "p\"\\0\"" = 1);
+	assert(parse_string "p\"\\n\"" = 1);
+	assert(parse_string "p\"\\t\"" = 1);
+	assert(parse_string "p\"\\r\"" = 1);
+	assert(parse_string "p\"\\a\"" = 1);
+	assert(parse_string "p\"\\\\\"" = 1);
+	(* string_expression *)
+	assert(parse_string "p\"ab\\{1+2}cc\"" = 1);
+	assert(parse_string "p\"ab\\{1+b\"aaa\"+2}cc\"" = 1);
+	assert(parse_string "p\"ab\\{1+2}cd\\{3+4}de\"" = 1);
+	()
+let test_bstring_literal() =
+	assert(parse_string "b\"string\"" = 1);
+	assert(parse_string "B\"string\"" = 1);
+	(* escape sequence *)
+	assert(parse_string "b\"\\0\"" = 1);
+	assert(parse_string "b\"\\n\"" = 1);
+	assert(parse_string "b\"\\t\"" = 1);
+	assert(parse_string "b\"\\r\"" = 1);
+	assert(parse_string "b\"\\a\"" = 1);
+	assert(parse_string "b\"\\\\\"" = 1);
+	(* string_expression *)
+	assert(parse_string "b\"ab\\{1+2}cc\"" = 1);
+	assert(parse_string "b\"ab\\{1+b\"aaa\"+2}cc\"" = 1);
+	assert(parse_string "b\"ab\\{1+2}cd\\{3+4}de\"" = 1);
+	()
+
+	let test_regexp_literal() =
+		assert(parse_string "/string/" = 1);
+		(* escape sequence *)
+		assert(parse_string "/\\0/" = 1);
+		assert(parse_string "/\\n/" = 1);
+		assert(parse_string "/\\t/" = 1);
+		assert(parse_string "/\\r/" = 1);
+		assert(parse_string "/\\a/" = 1);
+		assert(parse_string "/\\\\/" = 1);
+		assert(parse_string "/{a}/" = 1);
+		
+		(* string_expression *)
+		assert(parse_string "/ab\\{1+2}cc/" = 1);
+		assert(parse_string "/ab\\{1+/aaa/+2}cc/" = 1);
+		assert(parse_string "/ab\\{1+2}cd\\{\"3\"+4}de/" = 1);
+
+		()
+	
 let test_charactor_literal() =
 	assert(parse_string "'a'" = 1);
 	assert(parse_string "'1'" = 1);
@@ -29,7 +78,10 @@ let test_charactor_literal() =
 	()
 let test_literal () =
 	test_string_literal();
+	test_pstring_literal();
+	test_bstring_literal();
 	test_charactor_literal();
+	test_regexp_literal();
 	assert(parse_string "1" = 1);
 	assert(parse_string "-1" = 1);
 	assert(parse_string "+1" = 1);
