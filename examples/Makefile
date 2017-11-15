@@ -16,7 +16,7 @@ test:
 configure:
 	cd ../; ./configure --prefix=$HOME --with-optimize; make; sudo make install
 make1:
-	cd ../; make; sudo make install
+	cd ../; make && sudo make install && make test
 	clover2 dep_error.cl
 clean:
 	rm -rf *.o*

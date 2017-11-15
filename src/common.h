@@ -334,6 +334,7 @@ sCLClass* alloc_class(char* class_name, BOOL primitive_, int generics_param_clas
 ALLOC sCLType* create_cl_type(sCLClass* klass, sCLClass* klass2);
 void free_cl_type(sCLType* cl_type);
 sCLClass* load_class(char* class_name);
+char* get_error_class_file_name();
 sCLMethod* search_for_method_from_virtual_method_table(sCLClass* klass, char* method_name_and_params);
 BOOL is_valid_class(sCLClass* klass);
 BOOL put_class_to_table(char* class_name, sCLClass* klass);
@@ -1715,9 +1716,8 @@ void Self_convertion_of_method_name_and_params(char* method_name_and_params, cha
 BOOL compile_class_source(char* fname, char* source);
 
 /// cycle.c ///
-void set_dependency_compile();
+void set_dependency_compile(BOOL b);
 BOOL dependency_check(char* fname);
-BOOL dependency_compile(char* cwd, char* class_name, char* class_file_name, size_t class_file_name_size);
 void dependency_final();
 
 /// klass_compile_time.c ///

@@ -21,7 +21,6 @@ static void compiler_final()
     free_node_types();
     class_final();
     final_vtable();
-//    dependency_final();
 }
 
 static BOOL compiler(char* fname)
@@ -115,7 +114,6 @@ static BOOL class_compiler(char* fname)
 int main(int argc, char** argv)
 {
     int i;
-
     setlocale(LC_ALL, "");
 
     BOOL no_load_fudamental_classes = FALSE;
@@ -133,9 +131,6 @@ int main(int argc, char** argv)
         else if(strcmp(argv[i], "-class") == 0) {
             clcl_compile = TRUE;
         }
-        else if(strcmp(argv[i], "-dependency") == 0) {
-          set_dependency_compile();
-        }
         else {
             xstrncpy(sname, argv[i], PATH_MAX);
         }
@@ -146,31 +141,26 @@ int main(int argc, char** argv)
     if(ext_sname && strcmp(ext_sname, ".clcl") == 0) {
         clcl_compile = TRUE;
     }
-
-    compiler_init(no_load_fudamental_classes);
-
-    if(!dependency_check(sname)) {
-      fprintf(stderr, "cclover2 dependency check error %s\n", argv[i]);
+    set_dependency_compile(argv[0]==NULL);
+    while(1) {
+      compiler_init(no_load_fudamental_classes);
+      int rc = clcl_compile ? class_compiler(sname) : compiler(sname);
       compiler_final();
+
+      if (rc) {
+        if(argv[0]!=NULL)dependency_final();
+        return 0;
+      }
+      if(get_error_class_file_name()[0]!=0) {
+        char fname[PATH_MAX+20];
+        sprintf(fname,"%s.clcl",get_error_class_file_name());
+        char* argv2[2] = {NULL,fname};
+        if(dependency_check(fname)) {
+          if(main(2,argv2)==0) continue;
+        }
+      }
+      fprintf(stderr, "cclover2 can't compile %s\n", sname);
+      if(argv[0]!=NULL)dependency_final();
       return 1;
     }
-
-    if(clcl_compile) {
-        if(!class_compiler(sname)) {
-            fprintf(stderr, "cclover2 can't compile %s\n", argv[i]);
-            compiler_final();
-            return 1;
-        }
-    }
-    else {
-        if(!compiler(sname)) {
-            fprintf(stderr, "cclover2 can't compile %s\n", argv[i]);
-            compiler_final();
-            return 1;
-        }
-    }
-
-    compiler_final();
-
-    return 0;
 }

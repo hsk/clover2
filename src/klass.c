@@ -152,7 +152,6 @@ static BOOL search_for_class_file(char* class_name, char* class_file_name, size_
         if(access(class_file_name, F_OK) == 0) {
             return TRUE;
         }
-        return dependency_compile(cwd,class_name,class_file_name, class_file_name_size);
     }
 
     return FALSE;
@@ -707,6 +706,10 @@ sCLClass* get_class_with_load(char* class_name)
     return result;
 }
 
+char error_class_file_name[PATH_MAX+1];
+char* get_error_class_file_name() {
+  return error_class_file_name;
+}
 sCLClass* load_class(char* class_name)
 {
     sCLClass* klass = get_class(class_name);
@@ -715,7 +718,9 @@ sCLClass* load_class(char* class_name)
     }
 
     char class_file_name[PATH_MAX+1];
+    error_class_file_name[0] = 0;
     if(!search_for_class_file(class_name, class_file_name, PATH_MAX)) {
+        strcpy(error_class_file_name,class_name);
         return NULL;
     }
 
