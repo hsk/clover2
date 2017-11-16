@@ -47,16 +47,22 @@ let div_mode = ref false
 %left RETURN
 %type <int> expression
 %start expression
+%type <int> type_
+%start type_
 %%
 
 /*
-
-class_type        : WORD
+class_type        : WORD { 1 }
 */
-type_             : LAMBDA /* (LPAREN type_list? RPAREN)? type_option '[]'? annotation?*/ { 1 }
-type_             : LAMBDA LPAREN type_list RPAREN /*type_option '[]'? annotation?*/ { 1 }
-                  | WORD  /*('<' type_list1 '>')? '[]'? annotation? */ { 1 }
-
+type_             : LAMBDA type_option type_array_opt annotation_opt { 1 }
+                  | LAMBDA LPAREN type_list RPAREN type_option type_array_opt annotation_opt { 1 }
+                  | WORD type_params_opt type_array_opt annotation_opt { 1 }
+annotation_opt    : /* empty */ { 1 }
+                  | ANNOTATION { 1 }
+type_array_opt    : /* empty */ { 1 }
+                  | LBRACK RBRACK { 1 }
+type_params_opt   : /* empty */ { 1 }
+                  | LT type_list1 GT { 1 }
 type_list         : /* empty */ { 1 }
                   | type_list1 { 1 }
 type_list1        : type_ { 1 }
