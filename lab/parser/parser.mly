@@ -38,8 +38,10 @@ let div_mode = ref false
 %token COLON QUEST
 %token LPAREN RPAREN
 %token LBRACE RBRACE
-%token COMMA SEMI
+%token COMMA SEMI DOT
 %token COLON_ASSIGN ASSIGN
+%token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN LSH_ASSIGN RSH_ASSIGN AND_ASSIGN XOR_ASSIGN OR_ASSIGN
+%token ADDADD SUBSUB ARROW DOTDOT
 %token EOF
 %left INC DEC TIL ADD SUB
 %left RETURN
@@ -179,47 +181,69 @@ slash_word        : SLASH_WORD { 1 }
 assign_expression : slash_word COLON_ASSIGN expression { 1 }
                   | slash_word COLON type_ ASSIGN expression { 1 }
                   | slash_word ASSIGN expression { 1 }
-                  /*
-                    | slash_word assign_operator expression
-assign_operator   : "+="|"-="|"*="|"/="|"%="|"<<="|">>="|"&="|"^="|"|="
+                  | slash_word assign_operator expression { 1 }
+assign_operator   : ADD_ASSIGN { 1 }
+                  | SUB_ASSIGN { 1 }
+                  | MUL_ASSIGN { 1 }
+                  | DIV_ASSIGN { 1 }
+                  | LSH_ASSIGN { 1 }
+                  | RSH_ASSIGN { 1 }
+                  | AND_ASSIGN { 1 }
+                  | XOR_ASSIGN { 1 }
+                  | OR_ASSIGN { 1 }
+assign_operator_or_eq:
+                  | EQ { 1 }
+                  | assign_operator { 1 }
 
-method_expression : slash_word type '.' word method_params
-                    | slash_word type '.' word (assign_operator|'==') expression
-                    | slash_word method_params
+method_expression : slash_word type_ DOT WORD method_params { 1 }
+
+                    | slash_word type_ DOT WORD assign_operator_or_eq expression { 1 }
+                    | slash_word method_params { 1 }
+                    /*
                     | slash_word command_method_params
                       ("||" word command_method_params|"&&"|SEMI|"\n")*
 */
-method_params     : LPAREN expression_anns RPAREN /* simple_lambda_params? */ { 1 }
-                  | /* simple_lambda_params? */ { 1 }
+method_params     : LPAREN expression_anns RPAREN simple_lambda_params_opt { 1 }
+                  | simple_lambda_params_opt { 1 }
 expression_anns   : /* empty */ { 1 }
                   | expression_anns1 { 1 }
 expression_anns1  : expression ann { 1 }
                   | expression ann COMMA expression_anns1 { 1 }
-ann               : ANNOTATION { 1 }
+ann               : /* empty */ { 1 }
+                  | ANNOTATION { 1 }
+
+simple_lambda_params_opt: { 1 }
+                  | simple_lambda_params { 1 }
+simple_lambda_params:
+                  | LBRACE OR param_list OR type_option statement RBRACE { 1 }
+                  | LBRACE statement RBRACE { 1 }
 /*
-simple_lambda_params
-                  : LBRACE ("|" param_list "|" type_option)? (expression SEMI?)* RBRACE
 command_method_params
                   : SEMI | "\n" | '${' (not RBRACE)* RBRACE
                     | "$" (alpha|num|'_')* | '\' . | '"' . * '"' | "'" . * "'" *
 */
 expression_node   : collection_expression { 1 }
                   | control_expression { 1 }
-                  /*| assign_expression */
-                  /*| method_expression */
+                  | assign_expression { 1 }
+                  | method_expression { 1 }
                   | literal { 1 }
-                  /*| slash_word */
+                  | slash_word { 1 }
                   | LPAREN expression RPAREN { 1 }
-                  /*| '&' expression*/
-/*
-postposition_operator
-                  : '..' word (method_params|(assign_operator|'==') expression)?
-                    | '[' expression "]" ((assign_operator|'==') expression)?
-                    | '->' type ('==' expression)?
-                    | '++' | '--'
-*/
-postposition_operators
-                  : { 1 }
+                  | AND expression { 1 }
+
+postposition_operator:
+                  | DOTDOT WORD { 1 }
+                  | DOTDOT WORD method_params { 1 }
+                  | DOTDOT WORD assign_operator_or_eq expression { 1 }
+                  | LBRACK expression RBRACK { 1 }
+                  | LBRACK expression RBRACK assign_operator_or_eq expression { 1 }
+                  | ARROW type_ { 1 }
+                  | ARROW type_ EQ expression { 1 }
+                  | ADDADD { 1 }
+                  | SUBSUB { 1 }
+postposition_operators:
+                  | /* empty */ { 1 }
+                  | postposition_operator postposition_operators { 1 }
 expression_monadic: expression_node postposition_operators { 1 }
                   | INC expression_monadic { 1 }
                   | DEC expression_monadic { 1 }

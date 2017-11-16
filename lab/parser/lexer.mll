@@ -80,7 +80,23 @@ rule token = parse
 | "||" { r LOR }
 | '?' { r QUEST }
 | ':' { r COLON }
+| ":=" { r COLON_ASSIGN }
+| '=' { r ASSIGN }
+| "+=" { r ADD_ASSIGN }
+| "-=" { r SUB_ASSIGN }
+| "*=" { r MUL_ASSIGN }
+| "/=" { r DIV_ASSIGN }
+| "<<=" { r LSH_ASSIGN }
+| ">>=" { r RSH_ASSIGN }
+| "&=" { r AND_ASSIGN }
+| "^=" { r XOR_ASSIGN }
+| "|=" { r OR_ASSIGN }
+| "++" { n ADDADD }
+| "++" { n SUBSUB }
+| "->" { r ARROW }
 | ',' { r COMMA }
+| ".." { r DOTDOT }
+| '.' { r DOT }
 | eof { EOF }
 | '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) '"' { n(STR s) }
 | '"' (([^ '"' '\\'] | '\\' [^ '{'])* as s) "\\{" { braces := BStr :: !braces; r(LSTR s) }

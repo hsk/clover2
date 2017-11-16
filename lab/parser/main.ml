@@ -153,6 +153,45 @@ let test_literal () =
 	assert(parse_string "false" = 1);
 	assert(parse_string "null" = 1);
 	()
+let test_assign_expression() =
+	assert(parse_string "abc := 1" = 1);
+	assert(parse_string "../abc : int = 1" = 1);
+	assert(parse_string "../abc += 1" = 1);
+	assert(parse_string "../abc -= 1" = 1);
+	assert(parse_string "../abc *= 1" = 1);
+	assert(parse_string "../abc /= 1" = 1);
+	assert(parse_string "../abc <<= 1" = 1);
+	assert(parse_string "../abc >>= 1" = 1);
+	assert(parse_string "../abc &= 1" = 1);
+	assert(parse_string "../abc ^= 1" = 1);
+	assert(parse_string "../abc |= 1" = 1);
+	assert(parse_string "& abc" = 1);
+	()
+let test_method_expression() =
+	assert(parse_string "abc int.a()" = 1);
+	assert(parse_string "abc int.a(){}" = 1);
+	assert(parse_string "abc int.a(){| |  }" = 1);
+	assert(parse_string "abc int.a(){|a:int | a+1 }" = 1);
+	assert(parse_string "abc int.a(){|a:int,b:int |:int a+b }" = 1);
+	assert(parse_string "abc int.a == 1" = 1);
+	assert(parse_string "abc int.a += 1" = 1);
+	assert(parse_string "a()" = 1);
+	assert(parse_string "a(1 @abc)" = 1);
+	()
+let test_postposition_operator () = 
+	assert(parse_string "a..a" = 1);
+	assert(parse_string "a..a(1,2,3)" = 1);
+	assert(parse_string "a..a == 1" = 1);
+	assert(parse_string "a..a += 1" = 1);
+	assert(parse_string "a[1] == 1" = 1);
+	assert(parse_string "a[1] += 1" = 1);
+	
+	assert(parse_string "a->a" = 1);
+	assert(parse_string "a->a == 1" = 1);
+	assert(parse_string "a++" = 1);
+	assert(parse_string "a-- ++" = 1);
+	()
+	
 let test_implements () =
 	assert(parse_string "1 implements abc" = 1);
 	assert(parse_string "1 implements abc implements ddd" = 1);
@@ -226,6 +265,9 @@ let test_control() =
 let _ =
 	test_collection();
 	test_literal();
+	test_assign_expression();
+	test_method_expression();
+	test_postposition_operator();
 	(*test_implements();*)
 	test_mul();
 	test_add();

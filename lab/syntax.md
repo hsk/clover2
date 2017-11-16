@@ -14,7 +14,7 @@ boolean           ::= "true" | "false"
 slash_word        ::= ("./"|"../")? alpha (alpha|'_'|'/')*
 word              ::= alpha (alpha | '_')*
 annotation        ::= '@' (alpha (alpha | num | '-' | '_' | '[' | ']')* )?
-ann               ::= '@' (alpha | '_')*
+ann               ::= ('@' (alpha | '_')*)?
 
 class_type        ::= word
 type              ::= "lambda" ('(' type_list? ')')? (':' type)? '[]'? annotation?
