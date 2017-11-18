@@ -202,12 +202,11 @@ assign_operator_or_eq:
                   | assign_operator { 1 }
 
 method_expression : slash_word type_ DOT WORD method_params { 1 }
-
-                    | slash_word type_ DOT WORD assign_operator_or_eq expression { 1 }
-                    | slash_word method_params { 1 }
-                    /*
-                    | slash_word command_method_params
-                      ("||" word command_method_params|"&&"|SEMI|"\n")*
+                  | slash_word type_ DOT WORD assign_operator_or_eq expression { 1 }
+                  | slash_word method_params { 1 }
+                  /*
+                  | slash_word command_method_params
+                    ("||" word command_method_params|"&&"|SEMI|"\n")*
 */
 method_params     : LPAREN expression_anns RPAREN simple_lambda_params_opt { 1 }
                   | simple_lambda_params_opt { 1 }
@@ -218,7 +217,8 @@ expression_anns1  : expression ann { 1 }
 ann               : /* empty */ { 1 }
                   | ANNOTATION { 1 }
 
-simple_lambda_params_opt: { 1 }
+simple_lambda_params_opt:
+                  | /* empty */ { 1 }
                   | simple_lambda_params { 1 }
 simple_lambda_params:
                   | LBRACE OR param_list OR type_option statement RBRACE { 1 }
