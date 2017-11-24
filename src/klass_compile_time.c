@@ -1,4 +1,5 @@
 #include "common.h"
+#include <libgen.h>
 
 static void node_type_to_cl_type(sNodeType* node_type, ALLOC sCLType** cl_type, sCLClass* klass)
 {
@@ -12,6 +13,7 @@ static void node_type_to_cl_type(sNodeType* node_type, ALLOC sCLType** cl_type, 
     }
 
     (*cl_type)->mArray = node_type->mArray;
+    (*cl_type)->mNullable = node_type->mNullable;
 
     if(node_type->mBlockType) {
         (*cl_type)->mBlockType = MCALLOC(1, sizeof(sCLBlockType));
@@ -31,6 +33,7 @@ static void parser_param_to_cl_param(sParserParam* param, sCLParam* type, sCLCla
 {
     type->mNameOffset = append_str_to_constant_pool(&klass->mConst, param->mName, FALSE);
     node_type_to_cl_type(param->mType, ALLOC &type->mType, klass);
+    type->mDefaultValueOffset = append_str_to_constant_pool(&klass->mConst, param->mDefaultValue, FALSE);
 }
 
 static void create_method_path(char* result, int result_size, sCLMethod* method, sCLClass* klass)
@@ -47,6 +50,9 @@ static void create_method_path(char* result, int result_size, sCLMethod* method,
         xstrncat(result, CONS_str(&klass->mConst, method->mParams[i].mType->mClassNameOffset), result_size);
         if(method->mParams[i].mType->mArray) {
             xstrncat(result, "[]", result_size);
+        }
+        if(method->mParams[i].mType->mNullable) {
+            xstrncat(result, "?", result_size);
         }
 
         if(i != method->mNumParams-1) xstrncat(result, ",", result_size);
@@ -86,6 +92,7 @@ void create_method_name_and_params(char* result, int size_result, sCLClass* klas
         sNodeType* param_type = param_types[i];
         sCLClass* klass2 = param_type->mClass;
         BOOL array = param_type->mArray;
+        BOOL nullable = param_type->mNullable;
 
         if(klass2 == klass) {
             xstrncat(result, "Self", size_result);
@@ -96,6 +103,10 @@ void create_method_name_and_params(char* result, int size_result, sCLClass* klas
 
         if(array) {
             xstrncat(result, "[]", size_result);
+        }
+
+        if(nullable) {
+            xstrncat(result, "?", size_result);
         }
 
         if(i != num_params-1) {
@@ -212,9 +223,22 @@ BOOL add_method_to_class(sCLClass* klass, char* method_name, sParserParam* param
     klass->mMethods[num_methods].mFlags = (native_ ? METHOD_FLAGS_NATIVE : 0) | (static_ ? METHOD_FLAGS_CLASS_METHOD:0);
     klass->mMethods[num_methods].mNameOffset = append_str_to_constant_pool(&klass->mConst, method_name, FALSE);
 
+    BOOL method_arg_default_value = FALSE;
+
     int i;
     for(i=0; i<num_params; i++) {
         sParserParam* param = params + i;
+
+        /// メソッドパラメータのデフォルトの値があった場合、その後にも無いといけない
+        if(param->mDefaultValue[0] != '\0') {
+            method_arg_default_value = TRUE;
+        }
+        else {
+            if(method_arg_default_value) {
+                fprintf(stderr, "invalid method arg default value\n");
+                return FALSE;
+            }
+        }
 
         parser_param_to_cl_param(param, klass->mMethods[num_methods].mParams + i, klass);
     }
@@ -248,6 +272,7 @@ BOOL add_method_to_class(sCLClass* klass, char* method_name, sParserParam* param
     klass->mNumMethods++;
 
     if(klass->mNumMethods >= METHOD_NUM_MAX) {
+        fprintf(stderr, "overflow method number\n");
         return FALSE;
     }
 
@@ -266,7 +291,7 @@ BOOL add_typedef_to_class(sCLClass* klass, char* class_name1, char* class_name2)
         return FALSE;
     }
 
-    sCLClass* klass2 = get_class_with_load(class_name2);
+    sCLClass* klass2 = get_class_with_load_on_compile_time(class_name2);
 
     if(klass2) {
         put_class_to_table(class_name1, klass2);
@@ -302,7 +327,7 @@ BOOL add_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL protect
     return TRUE;
 }
 
-BOOL add_class_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL protected_, sNodeType* result_type)
+BOOL add_class_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL protected_, sNodeType* result_type, int initialize_value)
 {
     if(klass->mNumClassFields == klass->mSizeClassFields) {
         int new_size = klass->mSizeClassFields * 2;
@@ -315,6 +340,8 @@ BOOL add_class_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL p
 
     klass->mClassFields[num_fields].mFlags = (private_ ? FIELD_FLAGS_PRIVATE : 0) | (protected_ ? FIELD_FLAGS_PROTECTED:0);
     klass->mClassFields[num_fields].mNameOffset = append_str_to_constant_pool(&klass->mConst, name, FALSE);
+
+    klass->mClassFields[num_fields].mInitializeValue = initialize_value;
 
     node_type_to_cl_type(result_type, ALLOC &klass->mClassFields[num_fields].mResultType, klass);
 
@@ -369,6 +396,191 @@ BOOL determine_method_generics_types(sNodeType* left_param, sNodeType* right_par
     }
 
     return TRUE;
+}
+
+static BOOL search_for_class_file_on_compile_time(char* class_name, char* class_file_path, size_t class_file_path_size)
+{
+    /// ホームディレクトリのClover2のクラスファイルの置き場所にクラスファイルはありますか？ ///
+    char* home = getenv("HOME");
+
+    if(home) {
+        snprintf(class_file_path, class_file_path_size, "%s/.clover2/%s.oclcl", home, class_name);
+
+        if(access(class_file_path, F_OK) == 0) {
+            return TRUE;  // ありました。真を返します
+        }
+    }
+
+    /// カレントワーキングディレクトリにクラスファイルが存在しますか？ ///
+    char* cwd = getenv("PWD");
+
+    if(cwd) {
+        snprintf(class_file_path, class_file_path_size, "%s/%s.oclcl", cwd, class_name);
+
+        if(access(class_file_path, F_OK) == 0) {
+            /// ソース・ファイルのパスを得る ///
+            char source_path[PATH_MAX];
+            snprintf(source_path, PATH_MAX, "%s/%s.clcl", cwd, class_name);
+
+            char source_path2[PATH_MAX];
+            if(strstr(gCompilingSourceFileName, "/"))  // gCompilingSourceFileNameは絶対パスじゃないこともある
+            {
+                char* source_dir = dirname(gCompilingSourceFileName);
+
+                snprintf(source_path2, PATH_MAX, "%s/%s.clcl", source_dir, class_name);
+            }
+            else {
+                source_path2[0] = '\0';
+            }
+
+            /// 自動コンパイル機能を行う ///
+            struct stat class_file_path_stat;
+
+            if(stat(class_file_path, &class_file_path_stat) != 0) {
+                return FALSE;
+            }
+
+            if(access(source_path, F_OK) == 0) {
+                struct stat source_path_stat;
+
+                if(stat(source_path, &source_path_stat) != 0) {
+                    return FALSE;
+                }
+
+                /// ソースファイルのほうが新しいならコンパイルする
+                if(class_file_path_stat.st_mtime < source_path_stat.st_mtime) {
+                    /// コンパイル ///
+                    char command[PATH_MAX+128];
+
+                    snprintf(command, PATH_MAX+128, "cclover2 %s/%s.clcl", cwd, class_name);
+
+                    int rc = system(command);
+
+                    /// 一応クラスファイルがあるかどうかチェックして、あるなら真を返します ///
+                    if(rc == 0) {
+                        snprintf(class_file_path, class_file_path_size, "%s/%s.oclcl", cwd, class_name);
+
+                        if(access(class_file_path, F_OK) == 0) {
+                            return TRUE;
+                        }
+                    }
+                }
+                else {
+                    return TRUE;
+                }
+            }
+            else if(access(source_path2, F_OK) == 0) {
+                struct stat source_path_stat;
+
+                if(stat(source_path, &source_path_stat) != 0) {
+                    return FALSE;
+                }
+
+                if(class_file_path_stat.st_mtime < source_path_stat.st_mtime) {
+                    /// コンパイル ///
+                    char command[PATH_MAX+128];
+
+                    char* source_dir = dirname(gCompilingSourceFileName);
+
+                    snprintf(command, PATH_MAX+128, "cclover2 %s/%s.clcl", source_dir, class_name);
+
+                    int rc = system(command);
+
+                    /// 一応クラスファイルがあるかどうかチェックして、あるなら真を返します ///
+                    if(rc == 0) {
+                        snprintf(class_file_path, class_file_path_size, "%s/%s.oclcl", cwd, class_name);
+
+                        if(access(class_file_path, F_OK) == 0) {
+                            return TRUE;
+                        }
+                    }
+                }
+                else {
+                    return TRUE;
+                }
+            }
+            else {
+                return TRUE;
+            }
+        }
+        else {
+            /// クラスファイルが無いならクラス名.clclファイルのコンパイルを試してみます ///
+            char path[PATH_MAX];
+
+            snprintf(path, PATH_MAX, "%s/%s.clcl", cwd, class_name);
+
+            if(access(path, F_OK) == 0) {           // クラス名.clclファイルはありますか？
+                /// コンパイル ///
+                char command[PATH_MAX+128];
+
+                snprintf(command, PATH_MAX+128, "cclover2 %s/%s.clcl", cwd, class_name);
+
+                int rc = system(command);
+
+                /// 一応クラスファイルがあるかどうかチェックして、あるなら真を返します ///
+                if(rc == 0) {
+                    snprintf(class_file_path, class_file_path_size, "%s/%s.oclcl", cwd, class_name);
+
+                    if(access(class_file_path, F_OK) == 0) {
+                        return TRUE;
+                    }
+                }
+            }
+
+            /// ソースファイルのディレクトリも一応探しておく ///
+            if(strstr(gCompilingSourceFileName, "/")) {  // gCompilingSourceFileNameは絶対パスじゃないこともある
+                char source_path[PATH_MAX];
+
+                char* p = gCompilingSourceFileName + strlen(gCompilingSourceFileName);
+
+                while(*p != '/') {
+                    p--;
+                }
+
+                memcpy(source_path, gCompilingSourceFileName, p - gCompilingSourceFileName);
+                source_path[p - gCompilingSourceFileName] = '\0';
+
+                snprintf(path, PATH_MAX, "%s/%s.clcl", source_path, class_name);
+
+                /// ありゃ、dirname使えばいいのかな、、
+
+                if(access(path, F_OK) == 0) {
+                    /// コンパイル ///
+                    char command[PATH_MAX+128];
+
+                    snprintf(command, PATH_MAX+128, "cclover2 %s/%s.clcl", source_path, class_name);
+
+                    int rc = system(command);
+
+                    /// 一応クラスファイルがあるかどうかチェックして、あるなら真を返します ///
+                    if(rc == 0) {
+                        snprintf(class_file_path, class_file_path_size, "%s/%s.oclcl", cwd, class_name);
+
+                        if(access(class_file_path, F_OK) == 0) {
+                            return TRUE;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return FALSE; // 失敗。クラスファイルは見つかりませんね、、、。
+}
+
+sCLClass* load_class_on_compile_time(char* class_name)
+{
+    sCLClass* klass = get_class(class_name);
+    if(klass != NULL) {
+        remove_class(class_name);
+    }
+
+    char class_file_name[PATH_MAX+1];
+    if(!search_for_class_file_on_compile_time(class_name, class_file_name, PATH_MAX)) {
+        return NULL;
+    }
+
+    return load_class_from_class_file(class_name, class_file_name);
 }
 
 static BOOL check_method_params(sCLMethod* method, sCLClass* klass, char* method_name, sNodeType** param_types, int num_params, BOOL search_for_class_method, sNodeType* left_generics_type, sNodeType* right_generics_type, sNodeType* left_method_generics, sNodeType* right_method_generics, sNodeType* method_generics_types, BOOL lazy_lambda_compile)
@@ -467,7 +679,7 @@ int search_for_method(sCLClass* klass, char* method_name, sNodeType** param_type
     return -1;
 }
 
-BOOL search_for_methods_from_method_name(int method_indexes[], int size_method_indexes, int* num_methods, sCLClass* klass, char* method_name, int start_point)
+BOOL search_for_methods_from_method_name(int method_indexes[], int size_method_indexes, int* num_methods, sCLClass* klass, char* method_name, int start_point, BOOL class_method)
 {
     int i;
 
@@ -479,7 +691,8 @@ BOOL search_for_methods_from_method_name(int method_indexes[], int size_method_i
             
             method = klass->mMethods + i;
 
-            if(strcmp(METHOD_NAME2(klass, method), method_name) == 0) {
+            if(strcmp(METHOD_NAME2(klass, method), method_name) == 0 && ((method->mFlags & METHOD_FLAGS_CLASS_METHOD) ? 1:0) == class_method) 
+            {
                 method_indexes[*num_methods] = i;
                 (*num_methods)++;
 
@@ -590,6 +803,9 @@ BOOL check_implemented_methods_for_interface(sCLClass* left_class, sCLClass* rig
     if(right_class == anonymous_class) {
         return TRUE;
     }
+    else if(right_class->mFlags & CLASS_FLAGS_PRIMITIVE) {
+        return FALSE;
+    }
     else if(left_class != right_class) {
         int i;
         for(i=0; i<left_class->mNumMethods; i++) {
@@ -648,6 +864,7 @@ static void append_cl_type_to_buffer(sBuf* buf, sCLType* cl_type)
     }
 
     sBuf_append_int(buf, cl_type->mArray);
+    sBuf_append_int(buf, cl_type->mNullable);
 
     if(cl_type->mBlockType) {
         sBuf_append_int(buf, 1);
@@ -685,6 +902,7 @@ static void append_methods_to_buffer(sBuf* buf, sCLMethod* methods, sCLClass* kl
 
             sBuf_append_int(buf, param->mNameOffset);
             append_cl_type_to_buffer(buf, param->mType);
+            sBuf_append_int(buf, param->mDefaultValueOffset);
         }
 
         append_cl_type_to_buffer(buf, method->mResultType);
@@ -714,6 +932,8 @@ static void append_fields_to_buffer(sBuf* buf, sCLField* fields, int num_fields)
         sBuf_append_int(buf, field->mNameOffset);
 
         append_cl_type_to_buffer(buf, field->mResultType);
+
+        sBuf_append_int(buf, field->mInitializeValue);
     }
 }
 
@@ -814,3 +1034,87 @@ BOOL write_all_modified_classes()
     return TRUE;
 }
 
+static void load_fundamental_classes_on_compile_time()
+{
+    load_class_on_compile_time("PcreOVec");
+    load_class_on_compile_time("System");
+    load_class_on_compile_time("Global");
+
+    load_class_on_compile_time("Buffer");
+    load_class_on_compile_time("String");
+
+    load_class_on_compile_time("Exception");
+
+    load_class_on_compile_time("Object");
+
+    load_class_on_compile_time("Byte");
+    load_class_on_compile_time("UByte");
+    load_class_on_compile_time("Short");
+    load_class_on_compile_time("UShort");
+    load_class_on_compile_time("Integer");
+    load_class_on_compile_time("UInteger");
+    load_class_on_compile_time("Long");
+    load_class_on_compile_time("ULong");
+
+    load_class_on_compile_time("Float");
+    load_class_on_compile_time("Double");
+
+    load_class_on_compile_time("Pointer");
+    load_class_on_compile_time("Char");
+    load_class_on_compile_time("Bool");
+
+    load_class_on_compile_time("Array");
+    load_class_on_compile_time("EqualableArray");
+    load_class_on_compile_time("SortableArray");
+
+    load_class_on_compile_time("IHashKey");
+    load_class_on_compile_time("IEqualable");
+    load_class_on_compile_time("ISortable");
+
+    load_class_on_compile_time("HashItem");
+    load_class_on_compile_time("Hash");
+
+    load_class_on_compile_time("ListItem");
+    load_class_on_compile_time("List");
+    load_class_on_compile_time("SortableList");
+    load_class_on_compile_time("EqualableList");
+
+    load_class_on_compile_time("Tuple1");
+    load_class_on_compile_time("Tuple2");
+    load_class_on_compile_time("Tuple3");
+    load_class_on_compile_time("Tuple4");
+    load_class_on_compile_time("Tuple5");
+    load_class_on_compile_time("Tuple6");
+    load_class_on_compile_time("Tuple7");
+    load_class_on_compile_time("Tuple8");
+    load_class_on_compile_time("Tuple9");
+    load_class_on_compile_time("Tuple10");
+
+    load_class_on_compile_time("File");
+    load_class_on_compile_time("Path");
+    load_class_on_compile_time("tm");
+    load_class_on_compile_time("stat");
+    load_class_on_compile_time("Directory");
+    load_class_on_compile_time("termios");
+    load_class_on_compile_time("Job");
+    load_class_on_compile_time("Command");
+
+    load_class_on_compile_time("Clover");
+}
+
+void class_init_on_compile_time()
+{
+    load_fundamental_classes_on_compile_time();
+    set_boxing_and_unboxing_classes();
+}
+
+sCLClass* get_class_with_load_on_compile_time(char* class_name)
+{
+    sCLClass* result = get_class(class_name);
+    
+    if(result == NULL) {
+        result = load_class_on_compile_time(class_name);
+    }
+
+    return result;
+}

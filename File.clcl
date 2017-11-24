@@ -106,7 +106,7 @@ class System
     def dirname(path:String): static native String;
     def basename(path:String): static native String;
     def opendir(path:String): static native DIR throws Exception;
-    def readdir(dir:DIR): static native String@Nullable;
+    def readdir(dir:DIR): static native String?;
     def closedir(dir:DIR): static native int throws Exception;
     def chmod(path:String, mode:mode_t): static native throws Exception;
     def lchmod(path:String, mode:mode_t): static native throws Exception;
@@ -338,7 +338,7 @@ class stat
         p"/etc/passwd".read().toString().split(/\n/).each(closure(line:String) {
             fields:EqualableList<String> = line.chomp().split(/:/);
             
-            if(fields.items(2).to_int() == self.st_uid) {
+            if(fields.length() > 2 && fields.items(2).to_int() == self.st_uid) {
                 result = fields.items(0);
             }
         });
@@ -351,8 +351,8 @@ class stat
 
         p"/etc/group".read().toString().split(/\n/).each(closure(line:String) {
             fields:EqualableList<String> = line.chomp().split(/:/);
-            
-            if(fields.items(2).to_int() == self.st_gid) {
+
+            if(fields.length() > 2 && fields.items(2).to_int() == self.st_gid) {
                 result = fields.items(0);
             }
         });
@@ -371,7 +371,7 @@ class String
 class File
 {
     fd:int;
-    fileName:String;
+    fileName:String?;
 
     def initialize() {
         self.fd = -1;
@@ -618,7 +618,7 @@ class Directory
         }
     }
     
-    def readdir(): String@Nullable throws Exception {
+    def readdir(): String? throws Exception {
         if(self.dir == 0.to_pointer) {
             throw new Exception("This directory is not opened");
         }
@@ -638,7 +638,7 @@ class Directory
         result:SortableList<String> = new SortableList<String>();
 
         while(true) {
-            entry:String = dir.readdir();
+            entry:String? = dir.readdir();
 
             if(entry.identifyWith(null)) {
                 break;
@@ -665,7 +665,7 @@ class Directory
         result:SortableList<String> = new SortableList<String>();
 
         while(true) {
-            entry:String = dir.readdir();
+            entry:String? = dir.readdir();
 
             if(entry.identifyWith(null)) {
                 break;

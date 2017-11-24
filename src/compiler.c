@@ -21,6 +21,7 @@ static void compiler_final()
     free_node_types();
     class_final();
     final_vtable();
+//    dependency_final();
 }
 
 static BOOL compiler(char* fname)
@@ -139,7 +140,7 @@ int main(int argc, char** argv)
 
     char* ext_sname = strstr(sname, ".");
 
-    if(strcmp(ext_sname, ".clcl") == 0) {
+    if(ext_sname && strcmp(ext_sname, ".clcl") == 0) {
         clcl_compile = TRUE;
     }
 

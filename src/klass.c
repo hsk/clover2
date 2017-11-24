@@ -20,7 +20,7 @@ unsigned int get_hash_key(char* name, unsigned int max)
     return result % max;
 }
 
-static void remove_class(char* class_name)
+void remove_class(char* class_name)
 {
     unsigned int hash_key = get_hash_key(class_name, CLASS_NUM_MAX);
     sClassTable* p = gClassTable + hash_key;
@@ -254,8 +254,12 @@ static BOOL read_cl_type_from_file(int fd, sCLType** cl_type)
     if(!read_int_from_file(fd, &n)) {
         return FALSE;
     }
-
     (*cl_type)->mArray = n;
+
+    if(!read_int_from_file(fd, &n)) {
+        return FALSE;
+    }
+    (*cl_type)->mNullable = n;
 
     if(!read_int_from_file(fd, &n)) {
         return FALSE;
@@ -351,6 +355,12 @@ static BOOL read_methods_from_file(int fd, sCLMethod** methods, int* num_methods
             if(!read_cl_type_from_file(fd, &param->mType)) {
                 return FALSE;
             }
+
+            if(!read_int_from_file(fd, &n)) {
+                return FALSE;
+            }
+
+            param->mDefaultValueOffset = n;
         }
 
         if(!read_cl_type_from_file(fd, &method->mResultType)) {
@@ -423,6 +433,11 @@ static BOOL read_fields_from_file(int fd, sCLField** fields, int* num_fields, in
         if(!read_cl_type_from_file(fd, &field->mResultType)) {
             return FALSE;
         }
+
+        if(!read_int_from_file(fd, &n)) {
+            return FALSE;
+        }
+        field->mInitializeValue = n;
     }
 
     return TRUE;
@@ -618,6 +633,17 @@ sCLMethod* search_for_method_from_virtual_method_table(sCLClass* klass, char* me
     return NULL;
 }
 
+static sCLClass* get_class_with_load(char* class_name)
+{
+    sCLClass* result = get_class(class_name);
+    
+    if(result == NULL) {
+        result = load_class(class_name);
+    }
+
+    return result;
+}
+
 static BOOL ready_for_typedef(sCLClass* klass)
 {
     int i;
@@ -626,7 +652,6 @@ static BOOL ready_for_typedef(sCLClass* klass)
         char* class_name2 = CONS_str(&klass->mConst, klass->mTypedefClassName2Offsets[i]);
 
         sCLClass* klass = get_class_with_load(class_name2);
-
         if(klass) {
             put_class_to_table(class_name1, klass);
         }
@@ -638,7 +663,7 @@ static BOOL ready_for_typedef(sCLClass* klass)
     return TRUE;
 }
 
-static sCLClass* load_class_from_class_file(char* class_name, char* class_file_name)
+sCLClass* load_class_from_class_file(char* class_name, char* class_file_name)
 {
     /// check the existance of the load class ///
     int fd = open(class_file_name, O_RDONLY);
@@ -690,17 +715,6 @@ static sCLClass* load_class_from_class_file(char* class_name, char* class_file_n
     klass->mFreeFun = NULL;
 
     return klass;
-}
-
-sCLClass* get_class_with_load(char* class_name)
-{
-    sCLClass* result = get_class(class_name);
-    
-    if(result == NULL) {
-        result = load_class(class_name);
-    }
-
-    return result;
 }
 
 sCLClass* load_class(char* class_name)
@@ -878,80 +892,6 @@ void set_boxing_and_unboxing_classes()
     set_boxing_and_unboxing_class("pointer", "Pointer");
     set_boxing_and_unboxing_class("char", "Char");
     set_boxing_and_unboxing_class("bool", "Bool");
-}
-
-static void load_fundamental_classes_on_compile_time()
-{
-    load_class("PcreOVec");
-    load_class("System");
-    load_class("Global");
-
-    load_class("Buffer");
-    load_class("String");
-
-    load_class("Exception");
-
-    load_class("Object");
-
-    load_class("Byte");
-    load_class("UByte");
-    load_class("Short");
-    load_class("UShort");
-    load_class("Integer");
-    load_class("UInteger");
-    load_class("Long");
-    load_class("ULong");
-
-    load_class("Float");
-    load_class("Double");
-
-    load_class("Pointer");
-    load_class("Char");
-    load_class("Bool");
-
-    load_class("Array");
-    load_class("EqualableArray");
-    load_class("SortableArray");
-
-    load_class("IHashKey");
-    load_class("IEqualable");
-    load_class("ISortable");
-
-    load_class("HashItem");
-    load_class("Hash");
-
-    load_class("ListItem");
-    load_class("List");
-    load_class("SortableList");
-    load_class("EqualableList");
-
-    load_class("Tuple1");
-    load_class("Tuple2");
-    load_class("Tuple3");
-    load_class("Tuple4");
-    load_class("Tuple5");
-    load_class("Tuple6");
-    load_class("Tuple7");
-    load_class("Tuple8");
-    load_class("Tuple9");
-    load_class("Tuple10");
-
-    load_class("File");
-    load_class("Path");
-    load_class("tm");
-    load_class("stat");
-    load_class("Directory");
-    load_class("termios");
-    load_class("Job");
-    load_class("Command");
-
-    load_class("Clover");
-}
-
-void class_init_on_compile_time()
-{
-    load_fundamental_classes_on_compile_time();
-    set_boxing_and_unboxing_classes();
 }
 
 void class_init()

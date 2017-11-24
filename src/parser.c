@@ -102,6 +102,27 @@ void parser_init()
         }
     }
 
+    gCommandNames[n++] = MANAGED MSTRDUP("cd");
+
+    if(n >= size) {
+        size *= 2;
+        gCommandNames = MREALLOC(gCommandNames, sizeof(char*)*size);
+    }
+
+    gCommandNames[n++] = MANAGED MSTRDUP("jobs");
+
+    if(n >= size) {
+        size *= 2;
+        gCommandNames = MREALLOC(gCommandNames, sizeof(char*)*size);
+    }
+
+    gCommandNames[n++] = MANAGED MSTRDUP("fg");
+
+    if(n >= size) {
+        size *= 2;
+        gCommandNames = MREALLOC(gCommandNames, sizeof(char*)*size);
+    }
+
     gCommandNames[n] = NULL;
     gNumCommandNames = n;
 }
@@ -1150,6 +1171,32 @@ static BOOL parse_param(sParserParam* param, sParserInfo* info)
         return FALSE;
     }
 
+    /// デフォルト引数を得る。デフォルト引数が必要ない場合でもパースは出来てしまうのは内緒 ///
+    if(*info->p == '=') {
+        info->p++;
+        skip_spaces_and_lf(info);
+
+        char* p = info->p;
+
+        unsigned int node = 0;
+        if(!expression(&node, info)) {
+            return FALSE;
+        }
+
+        char* p2 = info->p;
+
+        if(p2 - p > METHOD_DEFAULT_PARAM_MAX) {
+            parser_err_msg(info, "overflow method default param character");
+            return FALSE;
+        }
+
+        memcpy(param->mDefaultValue, p, p2 - p);
+        param->mDefaultValue[p2 -p] = '\0';
+    }
+    else {
+        param->mDefaultValue[0] = '\0';
+    }
+
     return TRUE;
 }
 
@@ -1282,7 +1329,7 @@ BOOL parse_class_type(sCLClass** klass, sParserInfo* info)
         *klass = info->klass;
     }
     else {
-        *klass = get_class_with_load(class_name);
+        *klass = get_class_with_load_on_compile_time(class_name);
     }
 
     if(*klass == NULL) {
@@ -1436,6 +1483,17 @@ BOOL parse_type(sNodeType** result_type, sParserInfo* info)
 
     (*result_type)->mNumGenericsTypes = generics_num;
 
+    /// nullable ///
+    if(*info->p == '?') {
+        info->p++;
+        skip_spaces_and_lf(info);
+
+        (*result_type)->mNullable = TRUE;
+    }
+    else {
+        (*result_type)->mNullable = FALSE;
+    }
+
     /// anotation ///
     if(*info->p == '@') {
         info->p++;
@@ -1457,7 +1515,7 @@ BOOL parse_type(sNodeType** result_type, sParserInfo* info)
         sCLClass* klass = (*result_type)->mClass;
 
         for(i=0; i<generics_num; i++) {
-            sCLClass* left_type = get_class_with_load(CONS_str(&klass->mConst, klass->mGenericsParamTypeOffsets[i]));
+            sCLClass* left_type = get_class_with_load_on_compile_time(CONS_str(&klass->mConst, klass->mGenericsParamTypeOffsets[i]));
 
             sCLClass* right_type = (*result_type)->mGenericsTypes[i]->mClass;
 
@@ -1574,7 +1632,7 @@ BOOL parse_type_for_new(sNodeType** result_type, unsigned int* array_num, sParse
 
     for(i=0; i<generics_num; i++) {
         int generics_paramType_offset = klass->mGenericsParamTypeOffsets[i];
-        sCLClass* left_type = get_class_with_load(CONS_str(&klass->mConst, generics_paramType_offset));
+        sCLClass* left_type = get_class_with_load_on_compile_time(CONS_str(&klass->mConst, generics_paramType_offset));
 
         sCLClass* right_type = (*result_type)->mGenericsTypes[i]->mClass;
 
@@ -2566,6 +2624,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
     int num_method_chains = 0;
     unsigned int max_method_chains_node[METHOD_CHAIN_MAX];
 
+    /// ただの数値表現 ///
     if((*info->p == '-' && *(info->p+1) != '=' && *(info->p+1) != '-' && *(info->p+1) != '>') || (*info->p == '+' && *(info->p+1) != '=' && *(info->p+1) != '+')) 
     {
         if(*info->p == '-') {
@@ -2585,6 +2644,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             }
         }
     }
+    /// 16進数 ///
     else if(*info->p == '0' && *(info->p+1) == 'x') {
         info->p += 2;
 
@@ -2592,6 +2652,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             return FALSE;
         }
     }
+    /// 8進数 ///
     else if(*info->p == '0' && isdigit(*(info->p+1))) {
         info->p++;
 
@@ -2599,11 +2660,13 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             return FALSE;
         }
     }
+    /// ただの数値表現 ///
     else if(isdigit(*info->p)) {
         if(!get_number(FALSE, node, info)) {
             return FALSE;
         }
     }
+    /// 文字列 ///
     else if(*info->p == '"') {
         info->p++;
 
@@ -2691,6 +2754,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
 
         *node = sNodeTree_create_string_value(MANAGED value.mBuf, string_expressions, string_expression_offsets, num_string_expression, info);
     }
+    /// バッファクラスの値 ///
     else if((*info->p == 'B' || *info->p == 'b') && *(info->p+1) == '"') {
         info->p+=2;
 
@@ -2776,6 +2840,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
 
         *node = sNodeTree_create_buffer_value(MANAGED value.mBuf, value.mLen, string_expressions, string_expression_offsets, num_string_expression, info);
     }
+    /// パスの値 ///
     else if((*info->p == 'P' || *info->p == 'p') && *(info->p+1) == '"') {
         info->p+=2;
 
@@ -2861,6 +2926,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
 
         *node = sNodeTree_create_path_value(MANAGED value.mBuf, value.mLen, string_expressions, string_expression_offsets, num_string_expression, info);
     }
+    /// 文字の値 ///
     else if(*info->p == '\'') {
         info->p++;
 
@@ -2952,6 +3018,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             *node = sNodeTree_create_character_value(c, info);
         }
     }
+    /// 配列の値 ///
     else if(*info->p == '[') {
         info->p++;
         skip_spaces_and_lf(info);
@@ -2960,6 +3027,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             return FALSE;
         }
     }
+    /// ブロック ///
     else if(*info->p == '{') {
         info->p++;
         skip_spaces_and_lf(info);
@@ -2968,7 +3036,9 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             return FALSE;
         }
     }
-    else if(isalpha(*info->p) || (*info->p == '.' && *(info->p+1) == '/') || (*info->p == '.' && *(info->p+1) == '.' && *(info->p+2) == '/')) {
+    /// 文字から始まる式 ./configureや../configureはここに入る。その場合でシェルモードで利用する
+    else if(isalpha(*info->p) || (*info->p == '.' && *(info->p+1) == '/') || (*info->p == '.' && *(info->p+1) == '.' && *(info->p+2) == '/')) 
+    {
         char buf[VAR_NAME_MAX];
 
         char* p_before = info->p;
@@ -3157,7 +3227,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             }
         }
 
-        /// add variable ///
+        /// ローカル変数の追加。パース時にはローカル変数かどうかが分かっていないと困る ///
         else if(*info->p == ':') {
             skip_spaces_and_lf(info);
 
@@ -3212,7 +3282,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                 info->err_num++;
             }
         }
-        /// substitution ///
+        /// 変数への代入 ///
         else if(*info->p == '=' && *(info->p+1) != '=') {
             skip_spaces_and_lf(info);
 
@@ -3235,6 +3305,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                 *node = sNodeTree_create_store_variable(buf, NULL, right_node, info->klass, info);
             }
         }
+        /// -=, +=などの式 ///
         else if(is_assign_operator(info)) {
             skip_spaces_and_lf(info);
 
@@ -3248,15 +3319,21 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             *node = sNodeTree_create_store_variable(buf, NULL, *node, info->klass, info);
         }
         else {
-            sCLClass* klass = get_class(buf);
+            sCLClass* klass;
+            if(buf[0] >= 'A' && buf[0] <= 'Z') { // 大文字から始まるクラス名しかクラスフィールドとクラスメソッドはアクセスできなくしている。理由はOSXでファイル名が小文字と大文字を区別しないため。
+                klass = get_class(buf);
 
-            if(klass == NULL) {
-                klass = load_class(buf);
+                if(klass == NULL) {
+                    klass = load_class_on_compile_time(buf);
+                }
+            }
+            else {
+                klass = NULL;
             }
 
             sCLClass* global_klass = get_class("Global");
 
-            /// class name ///
+            /// クラス名だった ///
             if(klass) {
                 skip_spaces_and_lf(info);
 
@@ -3269,7 +3346,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                     return FALSE;
                 }
 
-                /// class field or class method ///
+                /// クラスフィールドとクラスメソッド ///
                 if(*info->p == '.') {
                     info->p++;
                     skip_spaces_and_lf(info);
@@ -3281,7 +3358,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                         return FALSE;
                     }
 
-                    /// class method ///
+                    /// クラスメソッド ///
                     if(*info->p == '(') {
                         unsigned int params[PARAMS_MAX];
                         int num_params = 0;
@@ -3299,7 +3376,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                             return FALSE;
                         }
                     }
-                    /// class field ///
+                    /// クラスフィールド ///
                     else {
                         if(is_assign_operator(info)) {
                             /// load field ///
@@ -3337,13 +3414,13 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                         }
                     }
                 }
-                /// class name ///
+                /// クラス名の次は必ず.がないといけない ///
                 else {
                     parser_err_msg(info, "require . operator");
                     info->err_num++;
                 }
             }
-            /// global class ///
+            /// グローバルクラスのメソッド？ ///
             else if(method_name_existance(global_klass, buf))
             {
                 skip_spaces_and_lf(info);
@@ -3368,7 +3445,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                     return FALSE;
                 }
             }
-            /// shell mode ///
+            /// コマンド名かつローカル変数でなかったらシェルモードに入る ///
             else if(including_slash || (get_variable_index(info->lv_table, buf) == -1 && is_command_name(buf) && *info->p != '('))
             {
                 unsigned int params[PARAMS_MAX];
@@ -3473,7 +3550,8 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                     }
                 }
             }
-            else if(get_variable_index(info->lv_table, buf) == -1 && is_command_name(buf) && *info->p == '(') 
+            /// ローカル変数でも無くて、コマンド名かつ(があるなら、それはコマンド名 vim("src/main.c")など
+            else if(get_variable_index(info->lv_table, buf) == -1 && is_command_name(buf) && *info->p == '(')
             {
                 skip_spaces_and_lf(info);
 
@@ -3503,12 +3581,13 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
                     return FALSE;
                 }
             }
+            /// 上のものが全部違ったら、ローカル変数で確定 ///
             else {
                 skip_spaces_and_lf(info);
 
                 *node = sNodeTree_create_load_variable(buf, info);
 
-                /// lambda call ///
+                /// 括弧があるならラムダ式の呼び出し ///
                 if(*info->p == '(') {
                     unsigned int params[PARAMS_MAX];
                     int num_params = 0;
@@ -3522,7 +3601,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             }
         }
     }
-    /// regex ///
+    /// 正規表現 ///
     else if(*info->p == '/' && *(info->p+1) != '*') {
         info->p++;
         skip_spaces_and_lf(info);
@@ -3627,6 +3706,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
 
         *node = sNodeTree_create_regex(MANAGED regex.mBuf, global, ignore_case, multiline, extended, dotall, anchored, dollar_endonly, ungreedy, string_expressions, string_expression_offsets, num_string_expression, info);
     }
+    /// 括弧の式 ///
     else if(*info->p == '(') {
         info->p++;
         skip_spaces_and_lf(info);
@@ -3647,6 +3727,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
             info->err_num++;
         }
     }
+    /// アドレス取得演算子 ///
     else if(*info->p == '&') {
         info->p++;
         skip_spaces_and_lf(info);
@@ -3658,6 +3739,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
 
         *node = sNodeTree_create_get_address(*node, info);
     }
+    /// ソースの終わりなら空の式を返す
     else if(*info->p == 0) {
         *node = 0;
         return TRUE;
@@ -3674,7 +3756,7 @@ static BOOL expression_node(unsigned int* node, sParserInfo* info)
         *node = 0;
     }
 
-    /// postposition operator ///
+    /// 値の後ろに来る式 ///
     if(!postposition_operator(node, info, &num_method_chains, max_method_chains_node))
     {
         return FALSE;

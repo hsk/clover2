@@ -1568,7 +1568,7 @@ static BOOL compile_if_expression(unsigned int node, sCompileInfo* info)
     create_label_name("label_if_end", label_end_point, LABEL_NAME_MAX, label_num);
 
     /// compile expression ///
-    sVarTable* lv_table = clone_var_table(info->lv_table);
+    //sVarTable* lv_table = clone_var_table(info->lv_table);
     unsigned int expression_node = gNodes[node].uValue.sIf.mExpressionNode;
 
     if(!compile(expression_node, info)) {
@@ -1610,7 +1610,7 @@ static BOOL compile_if_expression(unsigned int node, sCompileInfo* info)
         return FALSE;
     }
 
-    restore_var_table(info->lv_table, lv_table);
+    //restore_var_table(info->lv_table, lv_table);
 
     append_opecode_to_code(info->code, OP_STORE_VALUE_TO_GLOBAL, info->no_output);
     info->stack_num--;
@@ -1635,7 +1635,7 @@ static BOOL compile_if_expression(unsigned int node, sCompileInfo* info)
 
         int j;
         for(j=0; j<gNodes[node].uValue.sIf.mElifNum; j++) {
-            lv_table = clone_var_table(info->lv_table);
+            //lv_table = clone_var_table(info->lv_table);
 
             /// compile expression ///
             unsigned int elif_expression_node = gNodes[node].uValue.sIf.mElifExpressionNodes[j];
@@ -1678,7 +1678,7 @@ static BOOL compile_if_expression(unsigned int node, sCompileInfo* info)
                 return FALSE;
             }
 
-            restore_var_table(info->lv_table, lv_table);
+            //restore_var_table(info->lv_table, lv_table);
 
             append_opecode_to_code(info->code, OP_STORE_VALUE_TO_GLOBAL, info->no_output);
             info->stack_num--;
@@ -2186,6 +2186,162 @@ static sNodeType* get_methocs_generics_type(sParserInfo* info)
     return result;
 }
 
+/// メソッドのデフォルト引数 ///
+BOOL compile_params_method_default_value(sCLClass* klass, char* method_name, int* num_params, unsigned int params[PARAMS_MAX], sNodeType* param_types[PARAMS_MAX], sNodeType* generics_types, sCompileInfo* info, int size_method_indexes, int method_indexes[], int num_methods)
+{
+    int i;
+    for(i=0; i<num_methods; i++) {
+        sCLMethod* method = klass->mMethods + method_indexes[i];
+
+        if(method->mNumParams > *num_params) {
+            int j;
+            for(j=0; j<*num_params; j++) {
+                sNodeType* param;
+                sNodeType* solved_param;
+
+                param = create_node_type_from_cl_type(method->mParams[j].mType, klass);
+
+                if(!solve_generics_types_for_node_type(param, ALLOC &solved_param, generics_types, TRUE, FALSE)) 
+                {
+                    return FALSE;
+                }
+
+                if(!substitution_posibility(solved_param, param_types[j], NULL, NULL, NULL, NULL))
+                {
+                    break;
+                }
+            }
+
+            /// 対象のメソッドが見つかった（全部のsubstitution_posibilityが通っている)
+            if(j == *num_params) {
+                int k;
+                for(k=*num_params; k < method->mNumParams; k++) {
+                    sCLParam* param = method->mParams + k;
+
+                    char* source = CONS_str(&klass->mConst, param->mDefaultValueOffset);
+
+                    if(source[0] != '\0') {
+                        sParserInfo info2;
+
+                        info2.p = source;
+
+                        info2.sname = info->pinfo->sname;
+                        info2.sline = info->pinfo->sline;
+                        info2.err_num = info->pinfo->err_num;
+                        info2.lv_table = NULL;
+                        info2.parse_phase = info->pinfo->parse_phase;
+                        info2.klass = info->pinfo->klass;
+                        info2.generics_info = info->pinfo->generics_info;
+                        info2.method_generics_info = info->pinfo->method_generics_info;
+                        info2.cinfo = info;
+                        info2.included_source = FALSE;
+                        info2.get_type_for_interpreter = info->pinfo->get_type_for_interpreter;
+                        info2.next_command_is_to_bool = FALSE;
+                        info2.exist_block_object_err = info->pinfo->exist_block_object_err;
+
+                        unsigned int node = 0;
+                        if(!expression(&node, &info2)) {
+                            return FALSE;
+                        }
+
+                        if(!compile(node, info)) {
+                            return FALSE;
+                        }
+
+                        param_types[k] = info->type;
+
+                        (*num_params)++;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    return TRUE;
+}
+
+static BOOL compile_params(sCLClass* klass, char* method_name, int* num_params, unsigned int params[PARAMS_MAX], sNodeType* param_types[PARAMS_MAX], sNodeType* generics_types, sCompileInfo* info, BOOL lazy_lambda_compile, BOOL* exist_lazy_lamda_compile, BOOL class_method)
+{
+    /// 引数のboxingのための準備 ///
+    int size_method_indexes = 128;
+    int method_indexes[size_method_indexes];
+    int num_methods = 0;
+    if(!search_for_methods_from_method_name(method_indexes, size_method_indexes, &num_methods, klass, method_name, klass->mNumMethods-1, class_method))
+    {
+        compile_err_msg(info, "overflow number of the same name methods");
+        return FALSE;
+    }
+
+    int i;
+    for(i=0; i<*num_params; i++) {
+        int node2 = params[i];
+
+        enum eNodeType node2_type = gNodes[node2].mNodeType;
+
+        /// 最後の引数がブロックならlazy_lambda_compileする。（メソッドブロックの型推論のため)
+        if(lazy_lambda_compile && i == *num_params-1 && node2_type == kNodeTypeBlockObject) {
+            *exist_lazy_lamda_compile = TRUE;
+        }
+        /// その他は普通にコンパイルする ///
+        else {
+            if(!compile(node2, info)) {
+                return FALSE;
+            }
+
+            param_types[i] = info->type;
+
+            /// 引数をboxingすればメソッドが見つかるならboxingしないといけない ///
+            int j;
+            for(j=0; j<num_methods; j++) {
+                sCLMethod* method = klass->mMethods + method_indexes[j];
+
+                if(*num_params == method->mNumParams 
+                    && i < method->mNumParams) 
+                {
+                    sNodeType* param;
+                    sNodeType* solved_param;
+
+                    param = create_node_type_from_cl_type(method->mParams[i].mType, klass);
+
+                    if(!solve_generics_types_for_node_type(param, ALLOC &solved_param, generics_types, TRUE, FALSE)) 
+                    {
+                        return FALSE;
+                    }
+
+                    /// メソッド側の引数の型がインターフェースならboxingする。
+                    if(solved_param->mClass->mFlags & CLASS_FLAGS_INTERFACE) {
+                        boxing_to_lapper_class(&param_types[i], info);
+                    }
+                    /// メソッド側の引数がユーザークラスで引数がプリミティブ型ならboxingする。
+                    else {
+                        if(boxing_posibility(solved_param, param_types[i])) {
+                            cast_right_type_to_left_type(solved_param, &param_types[i], info);
+                        }
+
+                        /// Nullを代入しているなら戻り値はメソッド側の型にする。Null型ではメソッドサーチが通らないため
+                        if(substitution_posibility_with_class_name(solved_param, "Null")) {
+                            if(type_identify_with_class_name(param_types[i], "Null")) {
+                                param_types[i] = solved_param;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// メソッドのデフォルト引数 ///
+    if(!*exist_lazy_lamda_compile) {
+        if(!compile_params_method_default_value(klass, method_name, num_params, params, param_types, generics_types, info, size_method_indexes, method_indexes, num_methods))
+        {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
 static BOOL compile_class_method_call(unsigned int node, sCompileInfo* info)
 {
     sNodeType* param_types[PARAMS_MAX];
@@ -2194,24 +2350,6 @@ static BOOL compile_class_method_call(unsigned int node, sCompileInfo* info)
     sCLClass* klass = klass_type->mClass;
     int num_params = gNodes[node].uValue.sClassMethodCall.mNumParams;
     char* method_name = gNodes[node].uValue.sClassMethodCall.mMethodName;
-
-    /// get type of params without generating code ///
-    BOOL no_output_before = info->no_output;
-    info->no_output = TRUE;
-    int stack_num_before = info->stack_num;
-
-    int i;
-    for(i=0; i<num_params; i++) {
-        int node2 = gNodes[node].uValue.sClassMethodCall.mParams[i];
-        if(!compile(node2, info)) {
-            return FALSE;
-        }
-
-        param_types[i] = info->type;
-    }
-
-    info->no_output = no_output_before;
-    info->stack_num = stack_num_before;
 
     sNodeType* generics_types;
     if(info->pinfo->klass) {
@@ -2223,15 +2361,44 @@ static BOOL compile_class_method_call(unsigned int node, sCompileInfo* info)
 
     sNodeType* right_method_generics_types = get_methocs_generics_type(info->pinfo);
 
+    info->pinfo->exist_block_object_err = FALSE; // for interpreter completion
+
+    unsigned int params[PARAMS_MAX];
+    int i;
+    for(i=0; i<num_params; i++) {
+        params[i] = gNodes[node].uValue.sClassMethodCall.mParams[i];
+    }
+
+    /// compile params ///
+    BOOL exist_lazy_lamda_compile = FALSE;
+    if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types, info, FALSE, &exist_lazy_lamda_compile, TRUE))
+    {
+        return FALSE;
+    }
+
     sNodeType* result_type;
     sNodeType* result_method_generics_types = NULL;
     int method_index = search_for_method(klass, method_name, param_types, num_params, TRUE, klass->mNumMethods-1, generics_types, NULL, right_method_generics_types, &result_type, FALSE, FALSE, &result_method_generics_types);
 
-    if(method_index == -1) {
+    if(method_index != -1) {
+        if(!info->pinfo->exist_block_object_err) { // for interpreter completion
+            /// generate code ////
+            append_opecode_to_code(info->code, OP_INVOKE_METHOD, info->no_output);
+            append_class_name_to_constant_pool_and_code(info, klass);
+            append_int_value_to_code(info->code, method_index, info->no_output);
+
+            info->stack_num-=num_params;
+            info->stack_num++;
+
+            info->type = result_type;
+        }
+    }
+    else {
         if(klass->mFlags & CLASS_FLAGS_DYNAMIC_CLASS) {
             int num_method_chains = 0;
             int max_method_chains = gNodes[node].mMaxMethodChains;
 
+/*
             /// compile params ///
             info->pinfo->exist_block_object_err = FALSE; // for interpreter completion
 
@@ -2249,6 +2416,7 @@ static BOOL compile_class_method_call(unsigned int node, sCompileInfo* info)
 
                 param_types[i] = info->type;
             }
+*/
 
             if(!info->pinfo->exist_block_object_err) { // for interpreter completion
                 /// generate code ////
@@ -2295,32 +2463,6 @@ static BOOL compile_class_method_call(unsigned int node, sCompileInfo* info)
             return TRUE;
         }
     }
-    else {
-        info->pinfo->exist_block_object_err = FALSE; // for interpreter completion
-
-        /// compile params ///
-        int i;
-        for(i=0; i<num_params; i++) {
-            int node2 = gNodes[node].uValue.sClassMethodCall.mParams[i];
-            if(!compile(node2, info)) {
-                return FALSE;
-            }
-
-            param_types[i] = info->type;
-        }
-
-        if(!info->pinfo->exist_block_object_err) { // for interpreter completion
-            /// generate code ////
-            append_opecode_to_code(info->code, OP_INVOKE_METHOD, info->no_output);
-            append_class_name_to_constant_pool_and_code(info, klass);
-            append_int_value_to_code(info->code, method_index, info->no_output);
-
-            info->stack_num-=num_params;
-            info->stack_num++;
-
-            info->type = result_type;
-        }
-    }
     
     return TRUE;
 }
@@ -2352,63 +2494,6 @@ unsigned int sNodeTree_create_method_call(unsigned int object_node, char* method
     return node;
 }
 
-static BOOL compile_params(sCLClass* klass, char* method_name, int num_params, unsigned int params[PARAMS_MAX], sNodeType* param_types[PARAMS_MAX], sNodeType* generics_types, sCompileInfo* info, unsigned int node, BOOL lazy_lambda_compile, BOOL* exist_lazy_lamda_compile)
-{
-    int size_method_indexes = 128;
-    int method_indexes[size_method_indexes];
-    int num_methods = 0;
-    if(!search_for_methods_from_method_name(method_indexes, size_method_indexes, &num_methods, klass, method_name, klass->mNumMethods-1))
-    {
-        compile_err_msg(info, "overflow number of the same name methods");
-        return FALSE;
-    }
-
-    int i;
-    for(i=0; i<num_params; i++) {
-        int node2 = params[i];
-
-        enum eNodeType node2_type = gNodes[node2].mNodeType;
-
-        if(lazy_lambda_compile && i == num_params-1 && node2_type == kNodeTypeBlockObject) {
-            *exist_lazy_lamda_compile = TRUE;
-        }
-        else {
-            if(!compile(node2, info)) {
-                return FALSE;
-            }
-
-            param_types[i] = info->type;
-
-            /// boxing ///
-            int j;
-            for(j=0; j<num_methods; j++) {
-                sCLMethod* method = klass->mMethods + method_indexes[j];
-
-                if(num_params == method->mNumParams && i < method->mNumParams) {
-                    sNodeType* param;
-                    sNodeType* solved_param;
-
-                    param = create_node_type_from_cl_type(method->mParams[i].mType, klass);
-
-                    if(!solve_generics_types_for_node_type(param, ALLOC &solved_param, generics_types, TRUE, FALSE)) 
-                    {
-                        return FALSE;
-                    }
-
-                    if(boxing_posibility(solved_param, param_types[i])) {
-                        cast_right_type_to_left_type(solved_param, &param_types[i], info);
-                    }
-
-                    if(type_identify_with_class_name(param_types[i], "Null")) {
-                        param_types[i] = solved_param;
-                    }
-                }
-            }
-        }
-    }
-
-    return TRUE;
-}
 
 struct sCastMethods {
     char* method_name;
@@ -2443,7 +2528,7 @@ static BOOL call_normal_method(unsigned int node, sCompileInfo* info, sNodeType*
         info->pinfo->exist_block_object_err = FALSE; // for interpreter completion
 
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types, info, node, FALSE, &exist_lazy_lamda_compile)) {
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
             return FALSE;
         }
 
@@ -2463,7 +2548,7 @@ static BOOL call_normal_method(unsigned int node, sCompileInfo* info, sNodeType*
                 info->pinfo->exist_block_object_err = FALSE; // for interpreter completion
 
                 BOOL exist_lazy_lamda_compile = FALSE;
-                if(!compile_params(klass, method_name, num_params, params, param_types, generics_types, info, node, FALSE, &exist_lazy_lamda_compile)) {
+                if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
                     return FALSE;
                 }
 
@@ -2545,7 +2630,7 @@ static BOOL call_normal_method(unsigned int node, sCompileInfo* info, sNodeType*
 
         /// compile params ///
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types, info, node, FALSE, &exist_lazy_lamda_compile)) {
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
             return FALSE;
         }
 
@@ -2572,7 +2657,7 @@ static BOOL call_normal_method(unsigned int node, sCompileInfo* info, sNodeType*
 
         /// compile params ///
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types, info, node, FALSE, &exist_lazy_lamda_compile)) {
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
             return FALSE;
         }
 
@@ -2615,7 +2700,7 @@ static BOOL call_normal_method(unsigned int node, sCompileInfo* info, sNodeType*
         /// compile params ///
         BOOL lazy_lambda_compile = TRUE;
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types, info, node, lazy_lambda_compile, &exist_lazy_lamda_compile)) 
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types, info, lazy_lambda_compile, &exist_lazy_lamda_compile, FALSE)) 
         {
             return FALSE;
         }
@@ -2964,7 +3049,7 @@ static BOOL compile_method_call(unsigned int node, sCompileInfo* info)
     if(strcmp(method_name, "identifyWith") == 0) {
         /// compile params ///
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types2, info, node, FALSE, &exist_lazy_lamda_compile)) {
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types2, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
             return FALSE;
         }
 
@@ -3079,7 +3164,7 @@ static BOOL compile_method_call(unsigned int node, sCompileInfo* info)
 
         return TRUE;
     }
-    else if(type_identify_with_class_name(object_type, "Anonymous") && strcmp(method_name, "is") == 0) {
+    else if(strcmp(method_name, "is") == 0) {
         append_opecode_to_code(info->code, OP_CLASSNAME, info->no_output);
 
         info->type = create_node_type_with_class_name("String");
@@ -3089,7 +3174,7 @@ static BOOL compile_method_call(unsigned int node, sCompileInfo* info)
 
         /// compile params ///
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types2, info, node, FALSE, &exist_lazy_lamda_compile)) {
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types2, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
             return FALSE;
         }
 
@@ -3237,7 +3322,7 @@ static BOOL compile_new_operator(unsigned int node, sCompileInfo* info)
         info->pinfo->exist_block_object_err = FALSE; // for interpreter completion
 
         BOOL exist_lazy_lamda_compile = FALSE;
-        if(!compile_params(klass, method_name, num_params, params, param_types, generics_types2, info, node, FALSE, &exist_lazy_lamda_compile)) {
+        if(!compile_params(klass, method_name, &num_params, params, param_types, generics_types2, info, FALSE, &exist_lazy_lamda_compile, FALSE)) {
             return FALSE;
         }
 
@@ -3781,7 +3866,7 @@ static BOOL compile_load_field(unsigned int node, sCompileInfo* info)
         int field_index = search_for_field(klass, field_name);
 
         if(field_index == -1) {
-            compile_err_msg(info, "There is no field(%s) in this class(%s)", field_name, CLASS_NAME(klass));
+            compile_err_msg(info, "There is no field(%s) in this class(%s)(6)", field_name, CLASS_NAME(klass));
             info->err_num++;
 
             info->type = create_node_type_with_class_name("int"); // dummy
@@ -3884,7 +3969,7 @@ static BOOL compile_store_field(unsigned int node, sCompileInfo* info)
     int field_index = search_for_field(klass, field_name);
 
     if(field_index == -1) {
-        compile_err_msg(info, "There is no field(%s) in this class(%s)", field_name, CLASS_NAME(klass));
+        compile_err_msg(info, "There is no field(%s) in this class(%s)(1)", field_name, CLASS_NAME(klass));
         info->err_num++;
 
         info->type = create_node_type_with_class_name("int"); // dummy
@@ -3953,7 +4038,7 @@ static BOOL compile_load_class_field(unsigned int node, sCompileInfo* info)
     int field_index = search_for_class_field(klass, field_name);
 
     if(field_index == -1) {
-        compile_err_msg(info, "There is no field(%s) in this class(%s)", field_name, CLASS_NAME(klass));
+        compile_err_msg(info, "There is no field(%s) in this class(%s)(2)", field_name, CLASS_NAME(klass));
         info->err_num++;
 
         info->type = create_node_type_with_class_name("int"); // dummy
@@ -4027,7 +4112,7 @@ static BOOL compile_store_class_field(unsigned int node, sCompileInfo* info)
     int field_index = search_for_class_field(klass, field_name);
 
     if(field_index == -1) {
-        compile_err_msg(info, "There is no field(%s) in this class(%s)", field_name, CLASS_NAME(klass));
+        compile_err_msg(info, "There is no field(%s) in this class(%s)(3)", field_name, CLASS_NAME(klass));
         info->err_num++;
 
         info->type = create_node_type_with_class_name("int"); // dummy
@@ -6152,7 +6237,7 @@ BOOL compile_get_address(unsigned int node, sCompileInfo* info)
         int field_index = search_for_field(klass, field_name);
 
         if(field_index == -1) {
-            compile_err_msg(info, "There is no field(%s) in this class(%s)", field_name, CLASS_NAME(klass));
+            compile_err_msg(info, "There is no field(%s) in this class(%s)(4)", field_name, CLASS_NAME(klass));
             info->err_num++;
 
             info->type = create_node_type_with_class_name("int"); // dummy
@@ -6176,7 +6261,7 @@ BOOL compile_get_address(unsigned int node, sCompileInfo* info)
         int field_index = search_for_class_field(klass, field_name);
 
         if(field_index == -1) {
-            compile_err_msg(info, "There is no field(%s) in this class(%s)", field_name, CLASS_NAME(klass));
+            compile_err_msg(info, "There is no field(%s) in this class(%s)(5)", field_name, CLASS_NAME(klass));
             info->err_num++;
 
             info->type = create_node_type_with_class_name("int"); // dummy

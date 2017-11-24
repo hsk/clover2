@@ -663,6 +663,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -738,6 +739,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE}'
@@ -990,6 +992,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1127,7 +1138,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1280,6 +1291,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -3808,8 +3820,6 @@ ac_fn_c_check_header_mongrel "$LINENO" "readline/readline.h" "ac_cv_header_readl
 if test "x$ac_cv_header_readline_readline_h" = xyes; then :
   $as_echo "#define HAVE_READLINE_H 1" >>confdefs.h
 
-else
-  exit
 fi
 
 
@@ -3845,8 +3855,6 @@ fi
 $as_echo "$ac_cv_lib_readline_main" >&6; }
 if test "x$ac_cv_lib_readline_main" = xyes; then :
    LIBS="$LIBS -lreadline";
-else
-  exit
 fi
 ac_cv_lib_readline=ac_cv_lib_readline_main
 
@@ -3896,8 +3904,6 @@ ac_fn_c_check_header_mongrel "$LINENO" "math.h" "ac_cv_header_math_h" "$ac_inclu
 if test "x$ac_cv_header_math_h" = xyes; then :
   $as_echo "#define HAVE_MATH_H 1" >>confdefs.h
 
-else
-  exit
 fi
 
 
@@ -3933,8 +3939,6 @@ fi
 $as_echo "$ac_cv_lib_m_main" >&6; }
 if test "x$ac_cv_lib_m_main" = xyes; then :
    LIBS="$LIBS -lm";
-else
-  exit
 fi
 ac_cv_lib_m=ac_cv_lib_m_main
 
@@ -3942,8 +3946,6 @@ ac_fn_c_check_header_mongrel "$LINENO" "iconv.h" "ac_cv_header_iconv_h" "$ac_inc
 if test "x$ac_cv_header_iconv_h" = xyes; then :
   $as_echo "#define HAVE_ICONV_H 1" >>confdefs.h
 
-else
-  exit
 fi
 
 
@@ -3957,8 +3959,6 @@ ac_fn_c_check_header_mongrel "$LINENO" "pcre.h" "ac_cv_header_pcre_h" "$ac_inclu
 if test "x$ac_cv_header_pcre_h" = xyes; then :
   $as_echo "#define HAVE_PCRE_H 1" >>confdefs.h
 
-else
-  exit
 fi
 
 
@@ -3994,8 +3994,6 @@ fi
 $as_echo "$ac_cv_lib_pcre_main" >&6; }
 if test "x$ac_cv_lib_pcre_main" = xyes; then :
    LIBS="$LIBS -lpcre";
-else
-  exit
 fi
 ac_cv_lib_pcre=ac_cv_lib_pcre_main
 
@@ -4032,8 +4030,6 @@ fi
 $as_echo "$ac_cv_lib_rt_main" >&6; }
 if test "x$ac_cv_lib_rt_main" = xyes; then :
    LIBS="$LIBS -lrt";
-else
-  exit
 fi
 ac_cv_lib_rt=ac_cv_lib_rt_main
 

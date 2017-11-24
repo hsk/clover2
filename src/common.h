@@ -70,6 +70,7 @@
 #define METHOD_CHAIN_MAX 128
 #define STRING_EXPRESSION_MAX 32
 #define GLOBAL_STACK_MAX 256
+#define METHOD_DEFAULT_PARAM_MAX 1024
 
 /// CLVALUE ///
 typedef unsigned int CLObject;
@@ -186,6 +187,7 @@ struct sCLTypeStruct {
     struct sCLTypeStruct* mGenericsTypes[GENERICS_TYPES_MAX];
 
     BOOL mArray;
+    BOOL mNullable;
 
     sCLBlockType* mBlockType;
 };
@@ -196,6 +198,8 @@ struct sCLParamStruct {
     int mNameOffset;                // variable name
 
     sCLType* mType;
+
+    int mDefaultValueOffset;
 };
 
 typedef struct sCLParamStruct sCLParam;
@@ -261,6 +265,8 @@ struct sCLFieldStruct {
 
     sCLType* mResultType;
     CLVALUE mValue;
+
+    int mInitializeValue; // -1は初期化なし。enum型のためにある。
 
     int mDelegatedMethodIndex[METHOD_NUM_MAX];  // compile time variable
     int mNumDelegatedMethod;
@@ -337,6 +343,8 @@ sCLMethod* search_for_method_from_virtual_method_table(sCLClass* klass, char* me
 BOOL is_valid_class(sCLClass* klass);
 BOOL put_class_to_table(char* class_name, sCLClass* klass);
 BOOL jit_compile_all_classes();
+void remove_class(char* class_name);
+sCLClass* load_class_from_class_file(char* class_name, char* class_file_name);
 
 struct sClassTableStruct
 {
@@ -361,6 +369,7 @@ struct sNodeTypeStruct {
     int mNumGenericsTypes;
 
     BOOL mArray;
+    BOOL mNullable;
     MANAGED struct sNodeBlockTypeStruct* mBlockType;
 };
 
@@ -504,6 +513,8 @@ struct sParserInfoStruct
 
 typedef struct sParserInfoStruct sParserInfo;
 
+extern char gCompilingSourceFileName[PATH_MAX];
+
 void parser_init();
 void parser_final();
 struct sParserParamStruct;
@@ -546,6 +557,8 @@ struct sParserParamStruct
 {
     char mName[VAR_NAME_MAX];
     sNodeType* mType;
+
+    char mDefaultValue[METHOD_DEFAULT_PARAM_MAX];
 };
 
 typedef struct sParserParamStruct sParserParam;
@@ -835,6 +848,7 @@ BOOL compile_block_with_result(sNodeBlock* block, sCompileInfo* info);
 BOOL compile_script(char* fname, char* source);
 BOOL read_source(char* fname, sBuf* source);
 BOOL delete_comment(sBuf* source, sBuf* source2);
+void append_cwd_for_path(char* fname, char* fname2);
 
 /// script.c ///
 BOOL eval_file(char* fname, int stack_size);
@@ -1712,19 +1726,26 @@ void Self_convertion_of_method_name_and_params(char* method_name_and_params, cha
 
 BOOL compile_class_source(char* fname, char* source);
 
+/// cycle.c ///
+void set_dependency_compile();
+BOOL dependency_check(char* fname);
+BOOL dependency_compile(char* cwd, char* class_name, char* class_file_name, size_t class_file_name_size);
+void dependency_final();
+
 /// klass_compile_time.c ///
+sCLClass* get_class_with_load_on_compile_time(char* class_name);
+sCLClass* load_class_on_compile_time(char* class_name);
 BOOL add_method_to_class(sCLClass* klass, char* method_name, sParserParam* params, int num_params, sNodeType* result_type, BOOL native_, BOOL static_, sGenericsParamInfo* ginfo);
 BOOL add_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL protected_, sNodeType* result_type);
 BOOL add_typedef_to_class(sCLClass* klass, char* class_name1, char* class_name2);
-BOOL add_class_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL protected_, sNodeType* result_type);
+BOOL add_class_field_to_class(sCLClass* klass, char* name, BOOL private_, BOOL protected_, sNodeType* result_type, int initialize_value);
 void add_code_to_method(sCLMethod* method, sByteCode* code, int var_num);
 BOOL write_all_modified_classes();
 int search_for_method(sCLClass* klass, char* method_name, sNodeType** param_types, int num_params, BOOL search_for_class_method, int start_point, sNodeType* left_generics_type, sNodeType* right_generics_type, sNodeType* right_method_generics, sNodeType** result_type, BOOL lazy_lambda_compile, BOOL lazy_labda_compile2, sNodeType** method_generics_types);
-BOOL search_for_methods_from_method_name(int method_indexes[], int size_method_indexes, int* num_methods, sCLClass* klass, char* method_name, int start_point);
+BOOL search_for_methods_from_method_name(int method_indexes[], int size_method_indexes, int* num_methods, sCLClass* klass, char* method_name, int start_point, BOOL class_method);
 int search_for_field(sCLClass* klass, char* field_name);
 int search_for_class_field(sCLClass* klass, char* field_name);
 void add_dependences_with_node_type(sCLClass* klass, sNodeType* node_type);
-sCLClass* get_class_with_load(char* class_name);
 BOOL parse_params(sParserParam* params, int* num_params, sParserInfo* info, int chracter_type);
 BOOL check_implemented_methods_for_interface(sCLClass* left_class, sCLClass* right_class);
 BOOL method_name_existance(sCLClass* klass, char* method_name);

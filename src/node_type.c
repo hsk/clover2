@@ -78,6 +78,7 @@ sNodeType* clone_node_type(sNodeType* node_type)
     }
 
     node_type2->mArray = node_type->mArray;
+    node_type2->mNullable = node_type->mNullable;
 
     if(node_type->mBlockType) {
         node_type2->mBlockType = clone_node_block_type(node_type->mBlockType);
@@ -96,6 +97,7 @@ sNodeType* create_node_type_with_class_pointer(sCLClass* klass)
     node_type->mClass = klass;
     node_type->mNumGenericsTypes = 0;
     node_type->mArray = FALSE;
+    node_type->mNullable = FALSE;
     node_type->mBlockType = NULL;
 
     return node_type;
@@ -108,13 +110,14 @@ static void skip_spaces_for_parse_class_name(char** p)
     }
 }
 
-static sNodeType* parse_class_name(char** p, char** p2, char* buf)
+static sNodeType* parse_class_name(char** p, char** p2, char* buf, sParserInfo* info)
 {
     sNodeType* node_type = alloc_node_type();
 
     node_type->mClass = NULL;
     node_type->mNumGenericsTypes = 0;
     node_type->mArray = FALSE;
+    node_type->mNullable = FALSE;
     node_type->mBlockType = NULL;
 
     *p2 = buf;
@@ -126,14 +129,14 @@ static sNodeType* parse_class_name(char** p, char** p2, char* buf)
 
             **p2 = 0;
 
-            node_type->mClass = get_class_with_load(buf);
+            node_type->mClass = get_class_with_load_on_compile_time(buf);
 
             if(node_type->mClass == NULL) {
-                node_type->mClass = load_class(buf);
+                node_type->mClass = load_class_on_compile_time(buf);
             }
 
             while(1) {
-                node_type->mGenericsTypes[node_type->mNumGenericsTypes] = parse_class_name(p, p2, buf);
+                node_type->mGenericsTypes[node_type->mNumGenericsTypes] = parse_class_name(p, p2, buf, info);
                 node_type->mNumGenericsTypes++;
 
                 if(node_type->mNumGenericsTypes >= GENERICS_TYPES_MAX) {
@@ -165,13 +168,19 @@ static sNodeType* parse_class_name(char** p, char** p2, char* buf)
                 node_type->mArray = TRUE;
             }
         }
+        else if(**p == '?') {
+            (*p)++;
+            skip_spaces_for_parse_class_name(p);
+
+            node_type->mNullable = TRUE;
+        }
         else if(**p == '>') {
             **p2 = 0;
 
-            node_type->mClass = get_class_with_load(buf);
+            node_type->mClass = get_class_with_load_on_compile_time(buf);
 
             if(node_type->mClass == NULL) {
-                node_type->mClass = load_class(buf);
+                node_type->mClass = load_class_on_compile_time(buf);
             }
 
             return node_type;
@@ -187,10 +196,10 @@ static sNodeType* parse_class_name(char** p, char** p2, char* buf)
     if(*p2 - buf > 0) {
         **p2 = 0;
 
-        node_type->mClass = get_class_with_load(buf);
+        node_type->mClass = get_class_with_load_on_compile_time(buf);
 
         if(node_type->mClass == NULL) {
-            node_type->mClass = load_class(buf);
+            node_type->mClass = load_class_on_compile_time(buf);
         }
     }
 
@@ -204,7 +213,7 @@ sNodeType* create_node_type_with_class_name(char* class_name)
     char* p = class_name;
     char* p2 = buf;
 
-    return parse_class_name(&p, &p2, buf);
+    return parse_class_name(&p, &p2, buf, NULL);
 }
 
 sNodeType* create_node_type_with_generics_number(int generics_num)
@@ -229,7 +238,7 @@ sNodeType* create_node_type_from_cl_type(sCLType* cl_type, sCLClass* klass)
 {
     sNodeType* node_type = alloc_node_type();
 
-    node_type->mClass = get_class_with_load(CONS_str(&klass->mConst, cl_type->mClassNameOffset));
+    node_type->mClass = get_class_with_load_on_compile_time(CONS_str(&klass->mConst, cl_type->mClassNameOffset));
 
     MASSERT(node_type->mClass != NULL);
 
@@ -241,6 +250,7 @@ sNodeType* create_node_type_from_cl_type(sCLType* cl_type, sCLClass* klass)
     }
 
     node_type->mArray = cl_type->mArray;
+    node_type->mNullable = cl_type->mNullable;
 
     if(cl_type->mBlockType) {
         node_type->mBlockType = alloc_node_block_type();
@@ -314,7 +324,7 @@ BOOL substitution_posibility(sNodeType* left, sNodeType* right, sNodeType* left_
     if(left_class->mGenericsParamClassNum != -1 || right_class->mGenericsParamClassNum != -1) {
         return FALSE;
     }
-    else if(type_identify_with_class_name(right3, "Null") && (!(left_class->mFlags & CLASS_FLAGS_PRIMITIVE) || left3->mArray)) 
+    else if(type_identify_with_class_name(right3, "Null") && (!(left_class->mFlags & CLASS_FLAGS_PRIMITIVE) || left3->mArray) && left->mNullable) 
     {
         return TRUE;
     }
@@ -329,6 +339,9 @@ BOOL substitution_posibility(sNodeType* left, sNodeType* right, sNodeType* left_
     else if(left_class->mFlags & CLASS_FLAGS_INTERFACE) {
         if(right_class->mFlags & CLASS_FLAGS_INTERFACE) {
             return type_identify(left3, right3);
+        }
+        else if(right_class->mFlags & CLASS_FLAGS_PRIMITIVE) {
+            return FALSE;
         }
         else {
             return check_implemented_methods_for_interface(left_class, right_class);
@@ -415,7 +428,7 @@ BOOL type_identify_with_class_name(sNodeType* left, char* right_class_name)
 
 BOOL class_identify_with_class_name(sCLClass* klass, char* class_name)
 {
-    sCLClass* klass2 = get_class_with_load(class_name);
+    sCLClass* klass2 = get_class_with_load_on_compile_time(class_name);
 
     MASSERT(klass2 != NULL);
 
@@ -439,6 +452,7 @@ static void solve_Self_types_for_node_type(sNodeType* node_type, ALLOC sNodeType
 
         (*result)->mBlockType = node_type->mBlockType;
         (*result)->mArray = node_type->mArray;
+        (*result)->mNullable = node_type->mNullable;
     }
     else {
         (*result) = node_type;
@@ -477,6 +491,7 @@ BOOL solve_generics_types_for_node_type(sNodeType* node_type, ALLOC sNodeType** 
                 //if(i < generics_type->mNumGenericsTypes && generics_type->mGenericsTypes[i]) {
                     *result = ALLOC clone_node_type(generics_type->mGenericsTypes[i]);
                     (*result)->mArray = node_type2->mArray;
+                    (*result)->mNullable = node_type2->mNullable;
                     return TRUE;
                 }
                 else {
@@ -519,6 +534,7 @@ BOOL solve_generics_types_for_node_type(sNodeType* node_type, ALLOC sNodeType** 
         }
 
         (*result)->mArray = node_type2->mArray;
+        (*result)->mNullable = node_type2->mNullable;
     }
     else {
         *result = clone_node_type(node_type2); // no solve
@@ -537,7 +553,7 @@ sNodeType* create_generics_types_from_generics_params(sCLClass* klass)
     int i;
     for(i=0; i<klass->mNumGenerics; i++) {
         int offset = klass->mGenericsParamTypeOffsets[i];
-        sCLClass* interface = get_class_with_load(CONS_str(&klass->mConst, offset));
+        sCLClass* interface = get_class_with_load_on_compile_time(CONS_str(&klass->mConst, offset));
 
         MASSERT(interface != NULL);
 
@@ -606,6 +622,7 @@ void solve_generics_for_variable(sNodeType* generics_type, sNodeType** generics_
 
     (*generics_type2)->mNumGenericsTypes = generics_type->mNumGenericsTypes;
     (*generics_type2)->mArray = generics_type->mArray;
+    (*generics_type2)->mNullable = generics_type->mNullable;
     (*generics_type2)->mBlockType = generics_type->mBlockType;
 }
 
@@ -649,6 +666,9 @@ void print_node_type(sNodeType* node_type)
 
     if(node_type->mArray) {
         printf("[]");
+    }
+    if(node_type->mNullable) {
+        printf("?");
     }
 }
 
