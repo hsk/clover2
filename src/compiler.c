@@ -138,7 +138,7 @@ int main(int argc, char** argv)
         }
     }
 
-    char* ext_sname = strstr(sname, ".");
+    char* ext_sname = strrchr(sname, '.');
 
     if(ext_sname && strcmp(ext_sname, ".clcl") == 0) {
         clcl_compile = TRUE;

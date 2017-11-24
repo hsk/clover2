@@ -57,7 +57,7 @@ int main(int argc, char** argv, char* const * envp)
 
         /// oclファイル名を得る
 
-        char* p = strstr(source, ".");
+        char* p = strrchr(source, '.');
 
         if(p == NULL) {
             p = source + strlen(source);
